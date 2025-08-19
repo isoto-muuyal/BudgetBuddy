@@ -48,7 +48,7 @@ DATABASE_URL=postgresql://budgetwise_user:your_secure_password@localhost:5432/bu
 PGHOST=localhost
 PGPORT=5432
 PGUSER=budgetwise_user
-PGPASSWORD=your_secure_password
+PGPASSWORD=budgetwise
 PGDATABASE=budgetwise
 
 # JWT Configuration
