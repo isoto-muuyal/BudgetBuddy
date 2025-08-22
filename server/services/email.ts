@@ -16,7 +16,7 @@ export class EmailService {
   async sendVerificationEmail(email: string, fullName: string, verificationToken: string) {
     const recipient = new Recipient(email, fullName);
     
-    const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5000"}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5001"}/verify-email?token=${verificationToken}`;
 
     const emailParams = new EmailParams()
       .setFrom(this.sender)

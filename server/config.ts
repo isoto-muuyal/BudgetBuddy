@@ -1,6 +1,6 @@
 export const config = {
   mailersend: {
-    apiKey: process.env.MAILERSEND_API_KEY || "your_mailersend_api_key",
+    apiKey: process.env.MAILERSEND_API_KEY || "mlsn.b8a6462646c2e158d9642f84e5cc27121534e0fdd317bb4885ed184f835e29ca",
     fromEmail: process.env.FROM_EMAIL || "noreply@budgetwise.com",
     fromName: process.env.FROM_NAME || "BudgetWise",
   },

@@ -1,5 +1,3 @@
-import { randomUUID } from "crypto";
-import bcrypt from "bcrypt";
 import { users, budgetAnalyses, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -27,7 +25,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    console.log("Fetching user by email:", JSON.stringify(email));
+
+    const query = db.select().from(users).where(eq(users.email, email));
+    const [user] = await query;
+
+    console.log("User found.", email);
     return user || undefined;
   }
 
@@ -50,7 +53,7 @@ export class DatabaseStorage implements IStorage {
       .set({ monthlyIncome })
       .where(eq(users.id, userId))
       .returning();
-    
+
     if (!user) {
       throw new Error("User not found");
     }
@@ -87,7 +90,7 @@ export class DatabaseStorage implements IStorage {
       .set(updates)
       .where(eq(budgetAnalyses.id, id))
       .returning();
-    
+
     if (!analysis) {
       throw new Error("Budget analysis not found");
     }

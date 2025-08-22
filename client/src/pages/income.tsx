@@ -57,6 +57,7 @@ export default function Income() {
   });
 
   const onSubmit = (data: any) => {
+    console.log("Submitting income data:", data);
     incomeMutation.mutate(data);
   };
 

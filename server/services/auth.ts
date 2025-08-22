@@ -43,13 +43,20 @@ export class AuthService {
   }
 
   async login(loginData: LoginUser) {
+    console.log("Login attempt for:", loginData.email);
     const user = await storage.getUserByEmail(loginData.email);
     if (!user) {
+      console.error("Login failed: User not found");
       throw new Error("Invalid email or password");
     }
 
+    console.log("User found:", user.email);
+    console.log("User ID:", loginData.password);
+    console.log("User ID:", user.password);
     const isValidPassword = await bcrypt.compare(loginData.password, user.password);
+    console.log("Password match:", isValidPassword);
     if (!isValidPassword) {
+      console.error("Login failed: Invalid password");
       throw new Error("Invalid email or password");
     }
 

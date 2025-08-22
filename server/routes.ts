@@ -45,6 +45,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     try {
+      console.log("login started");
+      console.log("request: " + req.body)
       const loginData = loginSchema.parse(req.body);
       const result = await authService.login(loginData);
       res.json(result);
