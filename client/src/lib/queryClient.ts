@@ -7,38 +7,48 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+export async function apiRequest(method: string, url: string, data?: unknown | undefined,): Promise<Response> {
+  const headers: Record<string, string> = {}
+  // If body is NOT FormData, assume JSON
+  let fetchOptions: RequestInit = { method, headers };
 
-  await throwIfResNotOk(res);
+  console.log(`Making API request: ${method} ${url}`, data);
+
+ 
+  if (data instanceof FormData) {
+    fetchOptions.body = data; // let browser set Content-Type with boundary
+  } else if (data) {
+    headers["Content-Type"] = "application/json";
+    fetchOptions.body = JSON.stringify(data);
+  }
+
+  // If you use auth token
+  const token = localStorage.getItem("token");
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, fetchOptions);
+
+  if (!res.ok) {
+    throw new Error((await res.json()).message || "API request failed");
+  }
   return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+export const getQueryFn: <T>(options: {on401: UnauthorizedBehavior;}) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior }) => async ({ queryKey }) => {
+   try {
+      const res = await apiRequest("GET", queryKey.join("/") as string);
+      return await res.json();
+    } catch (err: any) {
+      if (unauthorizedBehavior === "returnNull" && err.message.startsWith("401")) {
+        return null;
+      }
+      throw err;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
+  
   };
 
 export const queryClient = new QueryClient({

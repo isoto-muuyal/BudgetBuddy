@@ -4,9 +4,9 @@ export const config = {
     fromEmail: process.env.FROM_EMAIL || "noreply@budgetwise.com",
     fromName: process.env.FROM_NAME || "BudgetWise",
   },
-  ollama: {
-    baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-    model: process.env.OLLAMA_MODEL || "llama2",
+  ai: {
+    baseUrl: process.env.AI_BASE_URL || "http://localhost:11434",
+    model: process.env.AI_MODEL || "llama2",
   },
   jwt: {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",

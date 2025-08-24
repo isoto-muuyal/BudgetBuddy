@@ -8,7 +8,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { verificationToken?: string }): Promise<User>;
-  updateUserIncome(userId: string, monthlyIncome: string): Promise<User>;
+  updateUserIncome(userId: string, monthlyIncome: number): Promise<User>;
   verifyUserEmail(userId: string): Promise<void>;
 
   // Budget analysis methods
@@ -47,14 +47,16 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserIncome(userId: string, monthlyIncome: string): Promise<User> {
+  async updateUserIncome(userId: string, monthlyIncome: number): Promise<User> {
+    console.log("Updating income for userId:", userId, "to", monthlyIncome);
     const [user] = await db
       .update(users)
-      .set({ monthlyIncome })
+      .set({ monthlyIncome: monthlyIncome.toString() }) // 👈 ensure string for decimal
       .where(eq(users.id, userId))
       .returning();
-
+    console.log("Updated user:", user);
     if (!user) {
+      console.error("Failed to update income, user not found:", userId);
       throw new Error("User not found");
     }
     return user;

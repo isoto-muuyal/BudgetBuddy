@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Budget() {
   const [, setLocation] = useLocation();
-
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/user/profile"],
   });

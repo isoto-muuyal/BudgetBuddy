@@ -37,6 +37,7 @@ export default function Income() {
 
   const incomeMutation = useMutation({
     mutationFn: async (data: IncomeInput) => {
+      console.log("Submitting income data:", data);
       const response = await apiRequest("POST", "/api/user/income", data);
       return response.json();
     },

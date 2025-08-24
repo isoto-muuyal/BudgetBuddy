@@ -67,6 +67,9 @@ export class AuthService {
       { expiresIn: "7d" }
     );
 
+    console.log("Login successful, token generated for user:", user.email);
+    console.log("Token:", token);
+
     return {
       token,
       user: {

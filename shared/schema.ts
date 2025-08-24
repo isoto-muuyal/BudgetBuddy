@@ -57,7 +57,7 @@ export const signupSchema = createInsertSchema(users).pick({
 });
 
 export const incomeSchema = z.object({
-  monthlyIncome: z.string().transform((val) => parseFloat(val)),
+  monthlyIncome: z.coerce.number().positive("Monthly income must be a positive number").optional(),
 });
 
 export const insertBudgetAnalysisSchema = createInsertSchema(budgetAnalyses).omit({

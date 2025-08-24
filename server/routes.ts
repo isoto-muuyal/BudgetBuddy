@@ -4,11 +4,12 @@ import multer from "multer";
 import path from "path";
 import { storage } from "./storage";
 import { authService } from "./services/auth";
-import { ollamaService } from "./services/ollama";
+import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { loginSchema, signupSchema, incomeSchema } from "@shared/schema";
 import { config } from "./config";
+import fs from "fs/promises";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -87,8 +88,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/user/income", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      console.log("Updating income for user:", req.user.id);
+      console.log("Income data:", req.body);
+
       const incomeData = incomeSchema.parse(req.body);
-      const updatedUser = await storage.updateUserIncome(req.user.id, incomeData.monthlyIncome.toString());
+      console.log("Income data:", incomeData);
+
+      console.log("debugging - Parsed monthlyIncome:", incomeData.monthlyIncome, typeof incomeData.monthlyIncome);
+      const updatedUser = await storage.updateUserIncome(req.user.id, incomeData.monthlyIncome ? incomeData.monthlyIncome : 0);
       
       res.json({
         message: "Income updated successfully",
@@ -102,6 +109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File upload and analysis routes
   app.post("/api/analysis/upload", authenticateToken, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     try {
+      console.log("File upload request received");
+      console.log("Request:" + req);
+      console.log("Uploaded file:", req.file);
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -115,7 +125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileName = fileProcessor.generateFileName(user.email, req.file.originalname);
       
       // Save file with new name
-      const filePath = await fileProcessor.saveFile(req.file.buffer || await require('fs').promises.readFile(req.file.path), fileName);
+      const fileBuffer = req.file.buffer || await fs.readFile(req.file.path);
+      const filePath = await fileProcessor.saveFile(fileBuffer, fileName);
 
       // Create budget analysis record
       const monthlyIncome = parseFloat(user.monthlyIncome);
@@ -182,17 +193,17 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
     // Extract text from file
     const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
     
-    // Analyze with Ollama
-    const ollamaResult = await ollamaService.analyzeExpenses(textContent, monthlyIncome);
+    // Analyze with AI
+    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome);
 
     // Update analysis with results
     await storage.updateBudgetAnalysis(analysisId, {
-      actualNeeds: ollamaResult.needs.toString(),
-      actualWants: ollamaResult.wants.toString(),
-      actualSavings: ollamaResult.savings.toString(),
-      actualUndefined: ollamaResult.undefined.toString(),
-      expenses: ollamaResult.expenses,
-      recommendations: ollamaResult.recommendations,
+      actualNeeds: aiResult.needs.toString(),
+      actualWants: aiResult.wants.toString(),
+      actualSavings: aiResult.savings.toString(),
+      actualUndefined: aiResult.undefined.toString(),
+      expenses: aiResult.expenses,
+      recommendations: aiResult.recommendations,
       analysisStatus: "completed",
     });
 

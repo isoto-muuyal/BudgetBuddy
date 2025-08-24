@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function UploadPage() {
   const [, setLocation] = useLocation();
@@ -15,21 +16,12 @@ export default function UploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      console.log("Uploading file:", file);
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/analysis/upload", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Upload failed");
-      }
-
-      return response.json();
+      const rest = await apiRequest("POST", "/api/analysis/upload", formData);
+      return rest.json();
     },
     onSuccess: (data) => {
       toast({
@@ -50,14 +42,15 @@ export default function UploadPage() {
   });
 
   const handleFileSelect = (file: File) => {
+    console.log("File to upload:", file);
     setSelectedFile(file);
-    
+
     // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
       progress += 10;
       setUploadProgress(progress);
-      
+
       if (progress >= 100) {
         clearInterval(interval);
       }
@@ -66,13 +59,14 @@ export default function UploadPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log("Selected file:", file);
     if (file) {
       const validTypes = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel'
       ];
-      
+
       if (!validTypes.includes(file.type)) {
         toast({
           title: "Invalid file type",
@@ -81,7 +75,7 @@ export default function UploadPage() {
         });
         return;
       }
-      
+
       handleFileSelect(file);
     }
   };
@@ -111,8 +105,7 @@ export default function UploadPage() {
           <div
             className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-brand-blue transition-colors cursor-pointer"
             onClick={() => document.getElementById('file-input')?.click()}
-            data-testid="dropzone-upload"
-          >
+            data-testid="dropzone-upload">
             <div className="space-y-4">
               <CloudUpload className="text-4xl text-gray-400 mx-auto" />
               <div>
@@ -149,13 +142,13 @@ export default function UploadPage() {
             )}
 
             <Button
+              type="button"
               onClick={handleAnalyze}
               disabled={!selectedFile || uploadProgress < 100 || uploadMutation.isPending}
-              className={`w-full py-3 rounded-lg font-medium transition-opacity ${
-                selectedFile && uploadProgress >= 100
-                  ? "gradient-brand text-white hover:opacity-90"
+              className={`w-full py-3 rounded-lg font-medium transition-colors ${selectedFile && uploadProgress >= 100
+                  ? "bg-blue-400 text-white hover:bg-blue-600"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              }`}
+                }`}
               data-testid="button-analyze"
             >
               {uploadMutation.isPending ? "Analyzing..." : "Analyze Expenses"}
