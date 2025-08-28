@@ -17,44 +17,108 @@ export interface AIExpenseAnalysis {
 export class AIService {
   private baseUrl: string;
   private model: string;
+  private accessToken: string;
+  private aiService: string;
 
   constructor() {
     this.baseUrl = config.ai.baseUrl;
     this.model = config.ai.model;
+    this.accessToken = config.ai.accessToken;
+    this.aiService = process.env.AI_SERVICE || "ollama"; // "ollama" or "huggingface"
   }
 
   async analyzeExpenses(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
-    const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
+    if (this.aiService === "huggingface") {
+      return this.analyzeWithHuggingFace(textContent, monthlyIncome);
+    } else {
+      return this.analyzeWithOllama(textContent, monthlyIncome);
+    }
+  }
 
+  async analyzeWithOllama(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
+    const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
+    console.log("AI Service started:");
+    console.log("AI Prompt:", prompt);
+    console.log("Using AI model:", this.model);
+    console.log("Using AI base URL:", this.baseUrl);
+    console.log("Using AI access token:", this.accessToken ? "****" : "(none)");
     try {
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
+      console.log("Sending request to HF:");
+      console.log(JSON.stringify({
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.model,
-          prompt,
-          stream: false,
-          options: {
-            temperature: 0.3,
-            top_p: 0.9,
-          },
+          inputs: prompt
+        }),
+      }, null, 2));
+      console.log("Request headers:", {
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json'
+      });
+      const response = await fetch(`${this.baseUrl}${this.model}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: prompt
         }),
       });
+
 
       if (!response.ok) {
         throw new Error(`AI API error: ${response.statusText}`);
       }
 
       const data = await response.json();
-      const analysisText = data.response;
+      console.log("Raw AI response:", data);
+      const analysisText = data[0]?.generated_text || "--no response--";
 
       return this.parseAnalysisResponse(analysisText);
     } catch (error) {
       console.error("AI analysis failed:", error);
       throw new Error("Failed to analyze expenses with AI");
     }
+  }
+
+  async analyzeWithHuggingFace(textContent: string, monthlyIncome: number) {
+    console.log("Using HuggingFace AI model:", this.model);
+    console.log("Using HuggingFace AI base URL:", this.baseUrl);
+    console.log("Using token:" , this.accessToken);
+
+    const prompt = `
+You are a financial advisor. Monthly income: $${monthlyIncome}.
+Analyze these transactions:
+${textContent}
+
+Provide JSON output with summary (needs, wants, savings, undefined), expenses, and recommendations.
+`;
+
+    const response = await fetch(`${config.ai.baseUrl}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.ai.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        prompt: prompt,
+        max_new_tokens: 512,
+        temperature: 0.7
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HF API error ${response.status}: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const textOutput = Array.isArray(data) ? data[0]?.generated_text || "" : data.generated_text || "";
+    return textOutput; // parse JSON from textOutput as needed
   }
 
   private buildAnalysisPrompt(textContent: string, monthlyIncome: number): string {
@@ -123,7 +187,7 @@ Important:
     } catch (error) {
       console.error("Failed to parse Ollama response:", error);
       console.log("Raw response:", responseText);
-      
+
       // Return a fallback response
       return {
         needs: 0,

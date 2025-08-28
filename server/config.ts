@@ -1,3 +1,5 @@
+import { access } from "fs";
+
 export const config = {
   mailersend: {
     apiKey: process.env.MAILERSEND_API_KEY || "mlsn.b8a6462646c2e158d9642f84e5cc27121534e0fdd317bb4885ed184f835e29ca",
@@ -6,13 +8,14 @@ export const config = {
   },
   ai: {
     baseUrl: process.env.AI_BASE_URL || "http://localhost:11434",
-    model: process.env.AI_MODEL || "llama2",
+    model: process.env.AI_MODEL || "sachin2505/accountant:latest",
+    accessToken: process.env.AI_ACCESS_TOKEN || "",
   },
   jwt: {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
-  mongodb: {
+  mongodb: { //change db, we are using postgresql
     uri: process.env.MONGODB_URI || "mongodb://localhost:27017/budgetwise",
   },
   uploads: {

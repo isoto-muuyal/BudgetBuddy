@@ -60,9 +60,10 @@ MAILERSEND_API_KEY=your_mailersend_api_key_here
 FROM_EMAIL=noreply@yourdomain.com
 FROM_NAME=BudgetWise
 
-# Ollama Configuration
+# AI Configuration
 AI_BASE_URL=http://localhost:11434
 AI_MODEL=llama2
+
 
 # File Upload Configuration
 UPLOADS_DIR=./uploads
