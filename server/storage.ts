@@ -1,3 +1,5 @@
+import { randomUUID } from "crypto";
+import bcrypt from "bcrypt";
 import { users, budgetAnalyses, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -8,7 +10,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { verificationToken?: string }): Promise<User>;
-  updateUserIncome(userId: string, monthlyIncome: number): Promise<User>;
+  updateUserIncome(userId: string, monthlyIncome: string): Promise<User>;
   verifyUserEmail(userId: string): Promise<void>;
 
   // Budget analysis methods
@@ -25,12 +27,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    console.log("Fetching user by email:", JSON.stringify(email));
-
-    const query = db.select().from(users).where(eq(users.email, email));
-    const [user] = await query;
-
-    console.log("User found.", email);
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
 
@@ -47,16 +44,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserIncome(userId: string, monthlyIncome: number): Promise<User> {
-    console.log("Updating income for userId:", userId, "to", monthlyIncome);
+  async updateUserIncome(userId: string, monthlyIncome: string): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({ monthlyIncome: monthlyIncome.toString() }) // 👈 ensure string for decimal
+      .set({ monthlyIncome })
       .where(eq(users.id, userId))
       .returning();
-    console.log("Updated user:", user);
+    
     if (!user) {
-      console.error("Failed to update income, user not found:", userId);
       throw new Error("User not found");
     }
     return user;
@@ -92,7 +87,7 @@ export class DatabaseStorage implements IStorage {
       .set(updates)
       .where(eq(budgetAnalyses.id, id))
       .returning();
-
+    
     if (!analysis) {
       throw new Error("Budget analysis not found");
     }

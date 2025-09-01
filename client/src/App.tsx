@@ -9,6 +9,9 @@ import Income from "@/pages/income";
 import Budget from "@/pages/budget";
 import Upload from "@/pages/upload";
 import Results from "@/pages/results";
+import About from "@/pages/about";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 import Navigation from "@/components/nav";
 import LoadingOverlay from "@/components/loading-overlay";
 import NotFound from "@/pages/not-found";
@@ -25,6 +28,9 @@ function Router() {
         <Route path="/budget" component={Budget} />
         <Route path="/upload" component={Upload} />
         <Route path="/results/:id" component={Results} />
+        <Route path="/about" component={About} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
         <Route component={NotFound} />
       </Switch>
       <LoadingOverlay />

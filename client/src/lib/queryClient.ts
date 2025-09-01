@@ -7,48 +7,68 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(method: string, url: string, data?: unknown | undefined,): Promise<Response> {
-  const headers: Record<string, string> = {}
-  // If body is NOT FormData, assume JSON
-  let fetchOptions: RequestInit = { method, headers };
+// Token management utilities
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token');
+};
 
-  console.log(`Making API request: ${method} ${url}`, data);
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem('auth_token', token);
+};
 
- 
-  if (data instanceof FormData) {
-    fetchOptions.body = data; // let browser set Content-Type with boundary
-  } else if (data) {
-    headers["Content-Type"] = "application/json";
-    fetchOptions.body = JSON.stringify(data);
-  }
+export const removeAuthToken = (): void => {
+  localStorage.removeItem('auth_token');
+};
 
-  // If you use auth token
-  const token = localStorage.getItem("token");
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Add Authorization header if token exists
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, fetchOptions);
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
 
-  if (!res.ok) {
-    throw new Error((await res.json()).message || "API request failed");
-  }
+  await throwIfResNotOk(res);
   return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {on401: UnauthorizedBehavior;}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) => async ({ queryKey }) => {
-   try {
-      const res = await apiRequest("GET", queryKey.join("/") as string);
-      return await res.json();
-    } catch (err: any) {
-      if (unauthorizedBehavior === "returnNull" && err.message.startsWith("401")) {
-        return null;
-      }
-      throw err;
+export const getQueryFn: <T>(options: {
+  on401: UnauthorizedBehavior;
+}) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior }) =>
+  async ({ queryKey }) => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    
+    // Add Authorization header if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  
+
+    const res = await fetch(queryKey.join("/") as string, {
+      headers,
+      credentials: "include",
+    });
+
+    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null;
+    }
+
+    await throwIfResNotOk(res);
+    return await res.json();
   };
 
 export const queryClient = new QueryClient({

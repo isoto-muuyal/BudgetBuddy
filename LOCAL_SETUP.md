@@ -48,7 +48,7 @@ DATABASE_URL=postgresql://budgetwise_user:your_secure_password@localhost:5432/bu
 PGHOST=localhost
 PGPORT=5432
 PGUSER=budgetwise_user
-PGPASSWORD=budgetwise
+PGPASSWORD=your_secure_password
 PGDATABASE=budgetwise
 
 # JWT Configuration
@@ -60,10 +60,9 @@ MAILERSEND_API_KEY=your_mailersend_api_key_here
 FROM_EMAIL=noreply@yourdomain.com
 FROM_NAME=BudgetWise
 
-# AI Configuration
-AI_BASE_URL=http://localhost:11434
-AI_MODEL=llama2
-
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama2
 
 # File Upload Configuration
 UPLOADS_DIR=./uploads
@@ -102,7 +101,7 @@ VALUES (
   'test@budgetwise.com', 
   'Test User', 
   '$2b$12$SlVRmlzQjvbhTPYIkRoEk.DsFNJNeKwMh268wKFjtTFjiHI8dz3ji', 
-  '5001', 
+  '5000', 
   true
 );
 ```
@@ -118,7 +117,7 @@ Test credentials:
 npm run dev
 ```
 
-The application will be available at: **http://localhost:5001**
+The application will be available at: **http://localhost:5000**
 
 ## Configuration Files
 

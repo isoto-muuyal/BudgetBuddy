@@ -1,11 +1,12 @@
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Bot, Download, Upload } from "lucide-react";
+import { BarChart3, Bot, Download, Upload, FileText, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ResultsProps {
   params: { id: string };
@@ -18,6 +19,10 @@ export default function Results({ params }: ResultsProps) {
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
     enabled: !!analysisId,
+  });
+
+  const { data: analysisHistory, isLoading: historyLoading } = useQuery<any[]>({
+    queryKey: ["/api/analysis"],
   });
 
   if (isLoading) {
@@ -221,6 +226,113 @@ export default function Results({ params }: ResultsProps) {
               Download Report
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Analysis History Section */}
+      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100 mt-6" data-testid="card-history">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+            <FileText className="mr-2 text-blue-500" />
+            Analysis History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : !analysisHistory || analysisHistory.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <p>No previous analyses found</p>
+              <p className="text-sm">Upload your first bank statement to get started!</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">File Name</TableHead>
+                    <TableHead>Upload Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Needs</TableHead>
+                    <TableHead className="text-right">Wants</TableHead>
+                    <TableHead className="text-right">Savings</TableHead>
+                    <TableHead className="w-[100px]">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analysisHistory
+                    .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())
+                    .map((historyItem) => (
+                      <TableRow 
+                        key={historyItem.id} 
+                        className={historyItem.id === analysisId ? "bg-blue-50" : ""}
+                        data-testid={`history-row-${historyItem.id}`}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center">
+                            <FileText className="mr-2 h-4 w-4 text-gray-400" />
+                            <span className="truncate max-w-[150px]" title={historyItem.originalFileName}>
+                              {historyItem.originalFileName}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Calendar className="mr-1 h-3 w-3" />
+                            {new Date(historyItem.uploadDate).toLocaleDateString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              historyItem.analysisStatus === "completed" 
+                                ? "default" 
+                                : historyItem.analysisStatus === "failed" 
+                                ? "destructive" 
+                                : "secondary"
+                            }
+                            data-testid={`status-${historyItem.id}`}
+                          >
+                            {historyItem.analysisStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {historyItem.actualNeeds ? `$${parseFloat(historyItem.actualNeeds).toFixed(0)}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {historyItem.actualWants ? `$${parseFloat(historyItem.actualWants).toFixed(0)}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {historyItem.actualSavings ? `$${parseFloat(historyItem.actualSavings).toFixed(0)}` : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {historyItem.id !== analysisId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setLocation(`/results/${historyItem.id}`)}
+                              data-testid={`button-view-${historyItem.id}`}
+                            >
+                              View
+                            </Button>
+                          )}
+                          {historyItem.id === analysisId && (
+                            <Badge variant="outline" className="text-xs">
+                              Current
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { promises as fs } from "fs";
 import multer from "multer";
 import path from "path";
 import { storage } from "./storage";
@@ -9,7 +10,6 @@ import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { loginSchema, signupSchema, incomeSchema } from "@shared/schema";
 import { config } from "./config";
-import fs from "fs/promises";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -46,8 +46,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     try {
-      console.log("login started");
-      console.log("request: " + req.body)
       const loginData = loginSchema.parse(req.body);
       const result = await authService.login(loginData);
       res.json(result);
@@ -88,14 +86,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/user/income", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      console.log("Updating income for user:", req.user.id);
-      console.log("Income data:", req.body);
-
       const incomeData = incomeSchema.parse(req.body);
-      console.log("Income data:", incomeData);
-
-      console.log("debugging - Parsed monthlyIncome:", incomeData.monthlyIncome, typeof incomeData.monthlyIncome);
-      const updatedUser = await storage.updateUserIncome(req.user.id, incomeData.monthlyIncome ? incomeData.monthlyIncome : 0);
+      const updatedUser = await storage.updateUserIncome(req.user.id, incomeData.monthlyIncome);
       
       res.json({
         message: "Income updated successfully",
@@ -109,9 +101,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File upload and analysis routes
   app.post("/api/analysis/upload", authenticateToken, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     try {
-      console.log("File upload request received");
-      console.log("Request:" + req);
-      console.log("Uploaded file:", req.file);
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -125,8 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileName = fileProcessor.generateFileName(user.email, req.file.originalname);
       
       // Save file with new name
-      const fileBuffer = req.file.buffer || await fs.readFile(req.file.path);
-      const filePath = await fileProcessor.saveFile(fileBuffer, fileName);
+      const filePath = await fileProcessor.saveFile(req.file.buffer || await fs.readFile(req.file.path), fileName);
 
       // Create budget analysis record
       const monthlyIncome = parseFloat(user.monthlyIncome);
