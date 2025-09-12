@@ -101,7 +101,7 @@ VALUES (
   'test@budgetwise.com', 
   'Test User', 
   '$2b$12$SlVRmlzQjvbhTPYIkRoEk.DsFNJNeKwMh268wKFjtTFjiHI8dz3ji', 
-  '5000', 
+  '5001', 
   true
 );
 ```
@@ -117,7 +117,7 @@ Test credentials:
 npm run dev
 ```
 
-The application will be available at: **http://localhost:5000**
+The application will be available at: **http://localhost:5001**
 
 ## Configuration Files
 

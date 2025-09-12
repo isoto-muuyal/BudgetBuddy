@@ -27,7 +27,10 @@ export async function apiRequest(
 ): Promise<Response> {
   const token = getAuthToken();
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  
+  console.log("API Request to:", url);
+  console.log("With method:", method);
+  console.log("With data:", data);
+  console.log("With token:", token);
   // Add Authorization header if token exists
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

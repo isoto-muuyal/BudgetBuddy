@@ -25,9 +25,10 @@ export default function Login() {
       password: "",
     },
   });
-
+  console.log("Render Login Component");
   const loginMutation = useMutation({
     mutationFn: async (data: LoginUser) => {
+      console.log("Login mutation called with data:", data);
       const response = await apiRequest("POST", "/api/auth/login", data);
       return response.json();
     },
@@ -43,6 +44,7 @@ export default function Login() {
       setLocation("/income");
     },
     onError: (error: Error) => {
+      console.log("Login error:", error);
       toast({
         title: "Error",
         description: error.message,
