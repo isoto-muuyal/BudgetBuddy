@@ -80,7 +80,8 @@ export default function UploadPage() {
       const validTypes = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel'
+        'application/vnd.ms-excel',
+        'text/csv'
       ];
       
       if (!validTypes.includes(file.type)) {
@@ -130,14 +131,14 @@ export default function UploadPage() {
                 <p className="text-sm text-gray-500">or click to browse</p>
               </div>
               <div className="text-xs text-gray-400">
-                Supports: PDF, Excel (.xlsx, .xls)
+                Supports: PDF, Excel (.xlsx, .xls), CSV
               </div>
             </div>
             <input
               id="file-input"
               type="file"
               className="hidden"
-              accept=".pdf,.xlsx,.xls"
+              accept=".pdf,.xlsx,.xls,.csv"
               onChange={handleFileChange}
               data-testid="input-file"
             />

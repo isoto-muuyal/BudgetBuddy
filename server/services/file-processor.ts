@@ -2,6 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import pdf from "pdf-parse";
 import xlsx from "xlsx";
+import csv from "csv-parser";
+import { createReadStream } from "fs";
 import { config } from "../config";
 
 export class FileProcessor {
@@ -15,6 +17,8 @@ export class FileProcessor {
         case '.xlsx':
         case '.xls':
           return await this.processExcel(filePath);
+        case '.csv':
+          return await this.processCsv(filePath);
         default:
           throw new Error("Unsupported file format");
       }
@@ -44,9 +48,9 @@ export class FileProcessor {
       workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
         const sheetData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-        
+
         textContent += `\n=== Sheet: ${sheetName} ===\n`;
-        
+
         sheetData.forEach((row: any) => {
           if (Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && cell !== "")) {
             textContent += row.join("\t") + "\n";
@@ -59,6 +63,27 @@ export class FileProcessor {
       console.error("Excel processing error:", error);
       throw new Error("Failed to extract data from Excel file");
     }
+  }
+
+  private async processCsv(filePath: string): Promise<string> {
+     return new Promise((resolve, reject) => {
+      let textContent = "";
+
+      createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (row: any) => {
+          // Join the row values with a tab for consistent formatting
+          textContent += Object.values(row).join('\t') + '\n';
+        })
+        .on('end', () => {
+          console.log("CSV file successfully processed.");
+          resolve(textContent);
+        })
+        .on('error', (error) => {
+          console.error("CSV processing error:", error);
+          reject(new Error("Failed to extract data from CSV file"));
+        });
+    });
   }
 
   async ensureUploadsDirectory(): Promise<void> {
@@ -78,10 +103,10 @@ export class FileProcessor {
 
   async saveFile(buffer: Buffer, fileName: string): Promise<string> {
     await this.ensureUploadsDirectory();
-    
+
     const filePath = path.join(config.uploads.directory, fileName);
     await fs.writeFile(filePath, buffer);
-    
+
     return filePath;
   }
 

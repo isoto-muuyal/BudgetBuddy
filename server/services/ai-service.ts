@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { pipeline, env } from '@huggingface/transformers';
+import { InferenceClient } from '@huggingface/inference';
 
 export interface AIExpenseAnalysis {
   needs: number;
@@ -22,12 +23,17 @@ export class AIService {
   private accessToken: string;
   private bertClassifier: any;
   private bertSentiment: any;
+  private hfClient: InferenceClient;
+  private bertClasifier: any;
+  //private bertSentiment: any;
+
 
   constructor() {
     this.baseUrl = config.ai.baseUrl;
     this.model = config.ai.model;
     this.aiService = config.ai.service;
     this.accessToken = config.ai.accessToken;
+    this.hfClient = new InferenceClient(this.accessToken);
     this.initializeHuggingFaceModels();
   }
 
@@ -48,9 +54,16 @@ export class AIService {
   }
 
   private async analyzeWithAI(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
-    const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
+    const prompt = `
+Return ONLY valid JSON. Do not include explanations or extra text. 
+The JSON must strictly follow this schema:
+${this.buildAnalysisPrompt(textContent, monthlyIncome)}
+`;
+
+  const userPrompt = `I earn $${monthlyIncome} per month. Here are my transactions:\n\n` + prompt;
 
     try {
+      console.log("Sending prompt to AI service:", userPrompt);
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
@@ -71,6 +84,8 @@ export class AIService {
         }),
       });
 
+      console.log('response', response);
+
       if (!response.ok) {
         throw new Error(`AI API error: ${response.statusText}`);
       }
@@ -85,14 +100,37 @@ export class AIService {
     }
   }
 
+  // Analyze using Hugging Face Inference API with finance-Llama3-8B model
   private async analyzeWithHuggingFace(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
-    // Use the same Hugging Face router API as analyzeWithAI for consistency
-    return this.analyzeWithAI(textContent, monthlyIncome);
+    const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
+
+    try {
+      console.log("Sending prompt to Hugging Face with HfInference client");
+      // Use the textGeneration method for LLMs
+      const result = await this.hfClient.chatCompletion({
+        model: this.model,
+        messages: [
+          { role: "system", content: "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. Always reply ONLY with valid JSON." },
+          { role: "user", content: prompt }
+        ],
+        max_tokens: 4096,
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      });
+
+      console.log('Hugging Face result:', result);
+      const analysisText = result.choices[0]?.message?.content ?? "";
+      console.log("Hugging Face analysis text:", analysisText);
+      return this.parseAnalysisResponse(analysisText);
+    } catch (error) {
+      console.error("AI analysis with HfInference failed:", error);
+      throw new Error("Failed to analyze expenses with Hugging Face");
+    }
   }
 
-  private extractTransactions(textContent: string): Array<{description: string, amount: number}> {
+  private extractTransactions(textContent: string): Array<{ description: string, amount: number }> {
     const lines = textContent.split('\n').filter(line => line.trim());
-    const transactions: Array<{description: string, amount: number}> = [];
+    const transactions: Array<{ description: string, amount: number }> = [];
 
     lines.forEach(line => {
       const amountMatch = line.match(/[-$]?[\d,]+\.?\d*/);
@@ -110,7 +148,7 @@ export class AIService {
     return transactions;
   }
 
-  private async classifyTransactionsWithBERT(transactions: Array<{description: string, amount: number}>): Promise<Array<{
+  private async classifyTransactionsWithBERT(transactions: Array<{ description: string, amount: number }>): Promise<Array<{
     description: string;
     amount: number;
     category: '50%' | '30%' | '20%' | 'undefined';
@@ -191,35 +229,35 @@ export class AIService {
 
   private simpleClassifyTransaction(description: string): '50%' | '30%' | '20%' | 'undefined' {
     const desc = description.toLowerCase();
-    
+
     // Needs (50%)
-    if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('grocery') || 
-        desc.includes('utility') || desc.includes('gas') || desc.includes('insurance') ||
-        desc.includes('phone') || desc.includes('internet') || desc.includes('medical') ||
-        desc.includes('pharmacy') || desc.includes('hospital')) {
+    if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('grocery') ||
+      desc.includes('utility') || desc.includes('gas') || desc.includes('insurance') ||
+      desc.includes('phone') || desc.includes('internet') || desc.includes('medical') ||
+      desc.includes('pharmacy') || desc.includes('hospital')) {
       return '50%';
     }
-    
+
     // Wants (30%)
     if (desc.includes('restaurant') || desc.includes('entertainment') || desc.includes('shopping') ||
-        desc.includes('coffee') || desc.includes('movie') || desc.includes('gym') ||
-        desc.includes('subscription') || desc.includes('clothing') || desc.includes('beauty') ||
-        desc.includes('amazon') || desc.includes('netflix') || desc.includes('spotify')) {
+      desc.includes('coffee') || desc.includes('movie') || desc.includes('gym') ||
+      desc.includes('subscription') || desc.includes('clothing') || desc.includes('beauty') ||
+      desc.includes('amazon') || desc.includes('netflix') || desc.includes('spotify')) {
       return '30%';
     }
-    
+
     // Savings (20%)
     if (desc.includes('savings') || desc.includes('investment') || desc.includes('transfer') ||
-        desc.includes('deposit') || desc.includes('401k') || desc.includes('ira')) {
+      desc.includes('deposit') || desc.includes('401k') || desc.includes('ira')) {
       return '20%';
     }
-    
+
     return 'undefined';
   }
 
   private getSubcategory(description: string, category: string): string {
     const desc = description.toLowerCase();
-    
+
     if (category === '50%') {
       if (desc.includes('rent') || desc.includes('mortgage')) return 'Housing';
       if (desc.includes('grocery') || desc.includes('food')) return 'Food';
@@ -228,7 +266,7 @@ export class AIService {
       if (desc.includes('medical') || desc.includes('health')) return 'Healthcare';
       return 'Essential';
     }
-    
+
     if (category === '30%') {
       if (desc.includes('restaurant') || desc.includes('dining')) return 'Dining';
       if (desc.includes('entertainment') || desc.includes('movie')) return 'Entertainment';
@@ -236,17 +274,17 @@ export class AIService {
       if (desc.includes('subscription') || desc.includes('streaming')) return 'Subscriptions';
       return 'Lifestyle';
     }
-    
+
     if (category === '20%') {
       if (desc.includes('investment') || desc.includes('stock')) return 'Investment';
       if (desc.includes('401k') || desc.includes('retirement')) return 'Retirement';
       return 'Savings';
     }
-    
+
     return 'Other';
   }
 
-  private calculateCategoryTotals(expenses: Array<{amount: number, category: string}>): {
+  private calculateCategoryTotals(expenses: Array<{ amount: number, category: string }>): {
     needs: number;
     wants: number;
     savings: number;
@@ -282,7 +320,7 @@ export class AIService {
     const recommendedSavings = monthlyIncome * 0.2;
 
     let recommendations = `Based on your BERT-analyzed spending patterns:\n\n`;
-    
+
     const needsPercentage = (totals.needs / monthlyIncome) * 100;
     const wantsPercentage = (totals.wants / monthlyIncome) * 100;
     const savingsPercentage = (totals.savings / monthlyIncome) * 100;
@@ -290,11 +328,11 @@ export class AIService {
     if (totals.needs > recommendedNeeds) {
       recommendations += `• Your essential needs spending (${needsPercentage.toFixed(1)}%) exceeds the recommended 50%. AI analysis suggests reviewing housing, food, and transportation costs for potential optimizations.\n`;
     }
-    
+
     if (totals.wants > recommendedWants) {
       recommendations += `• Your discretionary spending (${wantsPercentage.toFixed(1)}%) exceeds the recommended 30%. BERT identified entertainment and lifestyle categories that could be reduced.\n`;
     }
-    
+
     if (totals.savings < recommendedSavings) {
       recommendations += `• Your savings rate (${savingsPercentage.toFixed(1)}%) is below the recommended 20%. Consider automating transfers to reach your savings goals.\n`;
     }
@@ -308,7 +346,7 @@ export class AIService {
 
   private fallbackRuleBasedAnalysis(textContent: string, monthlyIncome: number): AIExpenseAnalysis {
     // Fallback analysis when BERT models fail to load or process
-    
+
     const lines = textContent.split('\n').filter(line => line.trim());
     const expenses: any[] = [];
     let totalNeeds = 0;
@@ -325,18 +363,18 @@ export class AIService {
           let subcategory = '';
 
           // Basic categorization rules
-          if (line.toLowerCase().includes('rent') || line.toLowerCase().includes('grocery') || 
-              line.toLowerCase().includes('utility') || line.toLowerCase().includes('gas')) {
+          if (line.toLowerCase().includes('rent') || line.toLowerCase().includes('grocery') ||
+            line.toLowerCase().includes('utility') || line.toLowerCase().includes('gas')) {
             category = '50%';
             subcategory = 'Essential';
             totalNeeds += amount;
           } else if (line.toLowerCase().includes('restaurant') || line.toLowerCase().includes('entertainment') ||
-                    line.toLowerCase().includes('shopping') || line.toLowerCase().includes('coffee')) {
+            line.toLowerCase().includes('shopping') || line.toLowerCase().includes('coffee')) {
             category = '30%';
             subcategory = 'Lifestyle';
             totalWants += amount;
           } else if (line.toLowerCase().includes('savings') || line.toLowerCase().includes('investment') ||
-                    line.toLowerCase().includes('transfer')) {
+            line.toLowerCase().includes('transfer')) {
             category = '20%';
             subcategory = 'Savings';
             totalSavings += amount;
@@ -357,15 +395,15 @@ export class AIService {
     const recommendedSavings = monthlyIncome * 0.2;
 
     let recommendations = `Based on your spending analysis:\n\n`;
-    
+
     if (totalNeeds > recommendedNeeds) {
       recommendations += `• Your needs spending (${((totalNeeds / monthlyIncome) * 100).toFixed(1)}%) exceeds the recommended 50%. Consider finding ways to reduce essential expenses.\n`;
     }
-    
+
     if (totalWants > recommendedWants) {
       recommendations += `• Your wants spending (${((totalWants / monthlyIncome) * 100).toFixed(1)}%) exceeds the recommended 30%. Try to cut back on non-essential purchases.\n`;
     }
-    
+
     if (totalSavings < recommendedSavings) {
       recommendations += `• Your savings (${((totalSavings / monthlyIncome) * 100).toFixed(1)}%) are below the recommended 20%. Try to increase your savings rate.\n`;
     }
@@ -393,7 +431,7 @@ You are a financial advisor analyzing bank statement data. Please categorize eac
 - 20% for SAVINGS: Money saved, invested, or put toward debt payments above minimums
 
 Monthly Income: $${monthlyIncome}
-Recommended breakdown:
+Breakdown:
 - Needs: $${(monthlyIncome * 0.5).toFixed(2)}
 - Wants: $${(monthlyIncome * 0.3).toFixed(2)}
 - Savings: $${(monthlyIncome * 0.2).toFixed(2)}
@@ -402,6 +440,36 @@ Bank Statement Content:
 ${textContent}
 
 Please analyze the transactions and provide your response in the following JSON format:
+
+The response must be a json object following the next format:
+{
+    summary
+    expenses
+    recommendations
+}
+
+Where summary looks like this
+  "summary": {
+    "50%": [total amount for needs],
+    "30%": [total amount for wants], 
+    "20%": [total amount for savings],
+    "undefined": [total amount for unclear categorization]
+  },
+
+expenses looks like this
+"expenses": [
+    {
+      "description": "[transaction description]",
+      "amount": [amount as number, negative for expenses, positive for income/savings],
+      "category": "[50%, 30%, 20%, or undefined]",
+      "subcategory": "[specific category like Housing, Food, Entertainment, etc.]"
+    }
+  ],
+
+and recommendations like this
+  "recommendations": "[Detailed recommendations for improving their budget based on the 50/30/20 rule. Provide specific actionable advice.]"
+
+The response object should look like this example
 
 {
   "summary": {
@@ -414,7 +482,7 @@ Please analyze the transactions and provide your response in the following JSON 
     {
       "description": "[transaction description]",
       "amount": [amount as number, negative for expenses, positive for income/savings],
-      "category": "[50%, 30%, 20%, or undefined]",
+      "category": "[50%, 30%, 20%, or undefined] this are the only categories allowed",
       "subcategory": "[specific category like Housing, Food, Entertainment, etc.]"
     }
   ],
@@ -426,31 +494,50 @@ Important:
 - Negative amounts are expenses, positive amounts are income or transfers to savings
 - Focus on providing actionable, specific recommendations
 - Consider their actual spending vs recommended percentages
+- when subcategory is Wants then category must be 30%
+-
 `;
   }
 
   private parseAnalysisResponse(responseText: string): AIExpenseAnalysis {
+    // A mapping object to handle inconsistent categories
+    const categoryMapping: { [key: string]: '50%' | '30%' | '20%' | 'undefined' } = {
+      '50%': '50%', '30%': '30%', '20%': '20%', 'undefined': 'undefined',
+      'Housing': '50%', 'Food': '50%', 'Utilities': '50%', 'Transportation': '50%',
+      'Insurance': '50%', 'Communications': '50%', 'Health': '50%',
+      'Entertainment': '30%', 'Lifestyle': '30%', 'Shopping': '30%',
+      'Savings': '20%', 'Investment': '20%',
+    };
     try {
+
       // Extract JSON from the response (handle cases where AI adds extra text)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No valid JSON found in AI response");
       }
 
-      const jsonData = JSON.parse(jsonMatch[0]);
+      const jsonData = JSON.parse(jsonMatch[0].trim());
+
+      const expenses = (jsonData.expenses || []).map((exp: any) => ({
+        ...exp,
+        // Use the mapping to get a consistent category
+        category: categoryMapping[exp.category] || 'undefined',
+        // If the subcategory is missing, assign a default based on the category
+        subcategory: exp.subcategory || exp.category // Fallback to category name if no subcategory
+      }));
 
       return {
         needs: parseFloat(jsonData.summary?.["50%"] || "0"),
         wants: parseFloat(jsonData.summary?.["30%"] || "0"),
         savings: parseFloat(jsonData.summary?.["20%"] || "0"),
         undefined: parseFloat(jsonData.summary?.["undefined"] || "0"),
-        expenses: jsonData.expenses || [],
+        expenses, // Use the new expenses array
         recommendations: jsonData.recommendations || "No specific recommendations available.",
       };
     } catch (error) {
       console.error("Failed to parse AI response:", error);
       console.log("Raw response:", responseText);
-      
+
       // Return a fallback response
       return {
         needs: 0,

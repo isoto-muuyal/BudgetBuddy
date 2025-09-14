@@ -21,7 +21,8 @@ const upload = multer({
     const allowedTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
+      'application/vnd.ms-excel',
+      'text/csv'
     ];
     
     if (allowedTypes.includes(file.mimetype)) {
@@ -183,6 +184,7 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
     
     // Analyze with AI
     const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome);
+    console.log(`AI analysis result for ${analysisId}:`, aiResult);
 
     // Update analysis with results
     await storage.updateBudgetAnalysis(analysisId, {
