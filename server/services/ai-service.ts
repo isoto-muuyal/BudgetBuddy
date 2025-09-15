@@ -60,7 +60,7 @@ The JSON must strictly follow this schema:
 ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
 `;
 
-  const userPrompt = `I earn $${monthlyIncome} per month. Here are my transactions:\n\n` + prompt;
+    const userPrompt = `I earn $${monthlyIncome} per month. Here are my transactions:\n\n` + prompt;
 
     try {
       console.log("Sending prompt to AI service:", userPrompt);
@@ -422,6 +422,35 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     };
   }
 
+  private calculateTotalsFromExpenses(
+    expenses: Array<{ amount: number; category: '50%' | '30%' | '20%' | 'undefined' }>
+  ): { needs: number; wants: number; savings: number; undefined: number } {
+    let needs = 0;
+    let wants = 0;
+    let savings = 0;
+    let uncategorized = 0;
+
+    expenses.forEach(exp => {
+      const value = Math.abs(exp.amount); // ensure positive for totals
+      switch (exp.category) {
+        case '50%':
+          needs += value;
+          break;
+        case '30%':
+          wants += value;
+          break;
+        case '20%':
+          savings += value;
+          break;
+        default:
+          uncategorized += value;
+      }
+    });
+
+    return { needs, wants, savings, undefined: uncategorized };
+  }
+
+
   private buildAnalysisPrompt(textContent: string, monthlyIncome: number): string {
     return `
 You are a financial advisor analyzing bank statement data. Please categorize each expense according to the 50/30/20 budgeting rule:
@@ -443,18 +472,17 @@ Please analyze the transactions and provide your response in the following JSON 
 
 The response must be a json object following the next format:
 {
-    summary
-    expenses
-    recommendations
+    expenses: [array of expenses]
+    recommendations: "detailed recommendations"
 }
 
-Where summary looks like this
-  "summary": {
-    "50%": [total amount for needs],
-    "30%": [total amount for wants], 
-    "20%": [total amount for savings],
-    "undefined": [total amount for unclear categorization]
-  },
+one expense object looks like this:
+{
+      "description": "[transaction description]",
+      "amount": [amount as number, negative for expenses, positive for income/savings],
+      "category": "[50%, 30%, 20%, or undefined]",
+      "subcategory": "[specific category like Housing, Food, Entertainment, etc.]"
+    }
 
 expenses looks like this
 "expenses": [
@@ -472,12 +500,6 @@ and recommendations like this
 The response object should look like this example
 
 {
-  "summary": {
-    "50%": [total amount for needs],
-    "30%": [total amount for wants], 
-    "20%": [total amount for savings],
-    "undefined": [total amount for unclear categorization]
-  },
   "expenses": [
     {
       "description": "[transaction description]",
@@ -495,7 +517,7 @@ Important:
 - Focus on providing actionable, specific recommendations
 - Consider their actual spending vs recommended percentages
 - when subcategory is Wants then category must be 30%
--
+- If subcategory is Housing then category must be 50%
 `;
   }
 
@@ -527,10 +549,7 @@ Important:
       }));
 
       return {
-        needs: parseFloat(jsonData.summary?.["50%"] || "0"),
-        wants: parseFloat(jsonData.summary?.["30%"] || "0"),
-        savings: parseFloat(jsonData.summary?.["20%"] || "0"),
-        undefined: parseFloat(jsonData.summary?.["undefined"] || "0"),
+         ...this.calculateTotalsFromExpenses(expenses),
         expenses, // Use the new expenses array
         recommendations: jsonData.recommendations || "No specific recommendations available.",
       };
