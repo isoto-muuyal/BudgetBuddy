@@ -227,6 +227,92 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     return classifiedExpenses;
   }
 
+// ---- New helper: normalize subcategory/category strings and map to 50/30/20 ----
+  private static SUBCATEGORY_TO_CATEGORY: Record<string, '50%' | '30%' | '20%'> = {
+    // Needs (50%)
+    housing: '50%',
+    rent: '50%',
+    mortgage: '50%',
+    food: '50%',
+    groceries: '50%',
+    utilities: '50%',
+    transportation: '50%',
+    gas: '50%',
+    insurance: '50%',
+    health: '50%',
+    medical: '50%',
+
+    // Wants (30%)
+    entertainment: '30%',
+    dining: '30%',
+    restaurant: '30%',
+    shopping: '30%',
+    subscriptions: '30%',
+    netflix: '30%',
+    coffee: '30%',
+    lifestyle: '30%',
+
+    // Savings (20%)
+    savings: '20%',
+    investment: '20%',
+    transfer: '20%',
+    'extra debt payment': '20%',
+    'deposit': '20%',
+  };
+
+   private normalizeExpenses(rawExpenses: any[]): AIExpenseAnalysis['expenses'] {
+    const allowedCategories = new Set(['50%', '30%', '20%', 'undefined']);
+
+    const normalizeKey = (s: unknown) => (typeof s === 'string' ? s.trim().toLowerCase() : '');
+
+    return (rawExpenses || []).map((e: any) => {
+      const description = typeof e?.description === 'string' ? e.description : String(e ?? '');
+      const amount = typeof e?.amount === 'number' ? e.amount : Number(e?.amount ?? 0);
+      let categoryRaw = typeof e?.category === 'string' ? e.category.trim() : '';
+      let category: AIExpenseAnalysis['expenses'][0]['category'] | undefined;
+
+      // If category is already one of the allowed canonical values, use it
+      if (allowedCategories.has(categoryRaw)) {
+        category = categoryRaw as AIExpenseAnalysis['expenses'][0]['category'];
+      }
+
+      const subcat = normalizeKey(e?.subcategory || '');
+
+      // 1) If category missing or 'undefined', try mapping from subcategory
+      if ((!category || category === 'undefined') && subcat) {
+        const mapped = (AIService.SUBCATEGORY_TO_CATEGORY as any)[subcat];
+        if (mapped) category = mapped;
+      }
+
+      // 2) If subcategory looks like a number (e.g. '50' or '50%'), convert to '50%'
+      if (!category && subcat) {
+        const numMatch = subcat.match(/^(\d{1,3})%?$/);
+        if (numMatch) {
+          const n = numMatch[1];
+          if (n === '50' || n === '30' || n === '20') {
+            category = (n + '%') as AIExpenseAnalysis['expenses'][0]['category'];
+          }
+        }
+      }
+
+      // 3) Try mapping using category text if it's a descriptive word (e.g. 'Housing')
+      if (!category && categoryRaw) {
+        const mapped = (AIService.SUBCATEGORY_TO_CATEGORY as any)[normalizeKey(categoryRaw)];
+        if (mapped) category = mapped;
+      }
+
+      // 4) Fallback: if still missing, keep 'undefined'
+      if (!category) category = 'undefined';
+
+      return {
+        description,
+        amount,
+        category,
+        subcategory: e?.subcategory ? String(e.subcategory) : undefined,
+      };
+    });
+  }
+  
   private simpleClassifyTransaction(description: string): '50%' | '30%' | '20%' | 'undefined' {
     const desc = description.toLowerCase();
 
@@ -282,6 +368,38 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     }
 
     return 'Other';
+  }
+
+ // ---- New helper: compute totals from normalized expenses ----
+  private calculateTotalsFromExpenses(expenses: AIExpenseAnalysis['expenses']): {
+    needs: number;
+    wants: number;
+    savings: number;
+    undefined: number;
+  } {
+    let needs = 0;
+    let wants = 0;
+    let savings = 0;
+    let undef = 0;
+
+    for (const exp of expenses) {
+      const val = Math.abs(Number(exp.amount) || 0);
+      switch (exp.category) {
+        case '50%':
+          needs += val;
+          break;
+        case '30%':
+          wants += val;
+          break;
+        case '20%':
+          savings += val;
+          break;
+        default:
+          undef += val;
+      }
+    }
+
+    return { needs, wants, savings, undefined: undef };
   }
 
   private calculateCategoryTotals(expenses: Array<{ amount: number, category: string }>): {
@@ -422,34 +540,33 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     };
   }
 
-  private calculateTotalsFromExpenses(
-    expenses: Array<{ amount: number; category: '50%' | '30%' | '20%' | 'undefined' }>
-  ): { needs: number; wants: number; savings: number; undefined: number } {
-    let needs = 0;
-    let wants = 0;
-    let savings = 0;
-    let uncategorized = 0;
+  // private calculateTotalsFromExpenses(
+  //   expenses: Array<{ amount: number; category: '50%' | '30%' | '20%' | 'undefined' }>
+  // ): { needs: number; wants: number; savings: number; undefined: number } {
+  //   let needs = 0;
+  //   let wants = 0;
+  //   let savings = 0;
+  //   let uncategorized = 0;
 
-    expenses.forEach(exp => {
-      const value = Math.abs(exp.amount); // ensure positive for totals
-      switch (exp.category) {
-        case '50%':
-          needs += value;
-          break;
-        case '30%':
-          wants += value;
-          break;
-        case '20%':
-          savings += value;
-          break;
-        default:
-          uncategorized += value;
-      }
-    });
+  //   expenses.forEach(exp => {
+  //     const value = Math.abs(exp.amount); // ensure positive for totals
+  //     switch (exp.category) {
+  //       case '50%':
+  //         needs += value;
+  //         break;
+  //       case '30%':
+  //         wants += value;
+  //         break;
+  //       case '20%':
+  //         savings += value;
+  //         break;
+  //       default:
+  //         uncategorized += value;
+  //     }
+  //   });
 
-    return { needs, wants, savings, undefined: uncategorized };
-  }
-
+  //   return { needs, wants, savings, undefined: uncategorized };
+  // }
 
   private buildAnalysisPrompt(textContent: string, monthlyIncome: number): string {
     return `
@@ -520,19 +637,10 @@ Important:
 - If subcategory is Housing then category must be 50%
 `;
   }
-
+ // ---- Updated parseAnalysisResponse to use normalization + totals ----
   private parseAnalysisResponse(responseText: string): AIExpenseAnalysis {
-    // A mapping object to handle inconsistent categories
-    const categoryMapping: { [key: string]: '50%' | '30%' | '20%' | 'undefined' } = {
-      '50%': '50%', '30%': '30%', '20%': '20%', 'undefined': 'undefined',
-      'Housing': '50%', 'Food': '50%', 'Utilities': '50%', 'Transportation': '50%',
-      'Insurance': '50%', 'Communications': '50%', 'Health': '50%',
-      'Entertainment': '30%', 'Lifestyle': '30%', 'Shopping': '30%',
-      'Savings': '20%', 'Investment': '20%',
-    };
     try {
-
-      // Extract JSON from the response (handle cases where AI adds extra text)
+      // Extract JSON block (robust to extra text)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No valid JSON found in AI response");
@@ -540,18 +648,22 @@ Important:
 
       const jsonData = JSON.parse(jsonMatch[0].trim());
 
-      const expenses = (jsonData.expenses || []).map((exp: any) => ({
-        ...exp,
-        // Use the mapping to get a consistent category
-        category: categoryMapping[exp.category] || 'undefined',
-        // If the subcategory is missing, assign a default based on the category
-        subcategory: exp.subcategory || exp.category // Fallback to category name if no subcategory
-      }));
+      // Ensure we have an array (defensive)
+      const rawExpenses = Array.isArray(jsonData.expenses) ? jsonData.expenses : [];
+
+      // Normalize categories and subcategories
+      const expenses = this.normalizeExpenses(rawExpenses);
+
+      // Calculate totals from normalized expenses
+      const totals = this.calculateTotalsFromExpenses(expenses);
 
       return {
-         ...this.calculateTotalsFromExpenses(expenses),
-        expenses, // Use the new expenses array
-        recommendations: jsonData.recommendations || "No specific recommendations available.",
+        needs: totals.needs,
+        wants: totals.wants,
+        savings: totals.savings,
+        undefined: totals.undefined,
+        expenses,
+        recommendations: typeof jsonData.recommendations === 'string' ? jsonData.recommendations : (jsonData.recommendation || "No specific recommendations available."),
       };
     } catch (error) {
       console.error("Failed to parse AI response:", error);
