@@ -7,6 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { generateAndDownloadPDF } from "@/components/ExpenseReportPDF";
+import { useState } from "react";
 
 interface ResultsProps {
   params: { id: string };
@@ -15,7 +18,9 @@ interface ResultsProps {
 export default function Results({ params }: ResultsProps) {
   const [, setLocation] = useLocation();
   const analysisId = params.id;
-
+  const { toast } = useToast();
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
     enabled: !!analysisId,
@@ -23,6 +28,10 @@ export default function Results({ params }: ResultsProps) {
 
   const { data: analysisHistory, isLoading: historyLoading } = useQuery<any[]>({
     queryKey: ["/api/analysis"],
+  });
+
+  const { data: userProfile } = useQuery<any>({
+    queryKey: ["/api/user/profile"],
   });
 
   if (isLoading) {
@@ -79,6 +88,55 @@ export default function Results({ params }: ResultsProps) {
     }
   };
 
+const handleDownloadReport = async () => {
+    if (!analysis || !userProfile) {
+      toast({
+        title: "Error",
+        description: "Unable to generate report. Missing data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const reportData = {
+        user: {
+          fullName: userProfile.fullName,
+          email: userProfile.email,
+        },
+        analysis: {
+          id: analysis.id,
+          monthlyIncome: analysis.monthlyIncome,
+          actualNeeds: analysis.actualNeeds,
+          actualWants: analysis.actualWants,
+          actualSavings: analysis.actualSavings,
+          recommendedNeeds: analysis.recommendedNeeds,
+          recommendedWants: analysis.recommendedWants,
+          recommendedSavings: analysis.recommendedSavings,
+          recommendations: analysis.recommendations,
+          expenses: analysis.expenses || [],
+          originalFileName: analysis.originalFileName,
+          uploadDate: analysis.uploadDate,
+        },
+      };
+      await generateAndDownloadPDF(reportData);
+      toast({
+        title: "Success",
+        description: "Report downloaded successfully!",
+      });
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+  
   return (
     <div className="max-w-md mx-auto p-4 pt-8">
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-results">
@@ -219,11 +277,13 @@ export default function Results({ params }: ResultsProps) {
               Upload New
             </Button>
             <Button
+              onClick={handleDownloadReport}
+              disabled={isGeneratingPDF || !userProfile}
               className="flex-1 bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
               data-testid="button-download"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download Report
+              {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
             </Button>
           </div>
         </CardContent>
