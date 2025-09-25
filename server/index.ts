@@ -61,7 +61,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5001 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '', 10);
+  const port = parseInt(process.env.PORT || '5003', 10);
   console.log("Starting server on port:", port);
   console.log("Environment:", app.get("env"));
   console.log("port:", port);

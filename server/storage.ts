@@ -30,6 +30,7 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     console.log("Fetching user by email:", email);
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    console.log("user ", user); 
     return user || undefined;
   }
 
