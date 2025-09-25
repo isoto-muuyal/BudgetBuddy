@@ -28,10 +28,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    console.log("Fetching user by email:", email);
+ console.log("Fetching user by email:", email);
+  try {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     console.log("user ", user); 
+    if (!user) {
+      console.log("No user found with that email");
+    }
     return user || undefined;
+  } catch (err: any) {
+    if (err.code === "42P01") {
+      // Postgres error code for "undefined_table"
+      console.error("❌ Table 'users' does not exist!");
+    } else {
+      console.error("Database error in getUserByEmail:", err);
+    }
+    throw err; // rethrow so your app can handle it
+  }
   }
 
   async getUserByVerificationToken(token: string): Promise<User | undefined> {

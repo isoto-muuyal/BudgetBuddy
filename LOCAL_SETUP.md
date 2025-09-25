@@ -33,7 +33,7 @@ psql -U postgres
 
 # Create database and user
 CREATE DATABASE budgetwise;
-CREATE USER budgetwise_user WITH PASSWORD 'your_secure_password';
+CREATE USER budgetwise_user WITH PASSWORD 'budgetwise';
 GRANT ALL PRIVILEGES ON DATABASE budgetwise TO budgetwise_user;
 \q
 ```
