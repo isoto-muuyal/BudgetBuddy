@@ -116,6 +116,14 @@ dist
 # DynamoDB Local files
 .dynamodb/
 
+# Upload folder
+.upload/
+.upload/**
+.uploads/
+.uploads/**
+.training_data/
+.training_data/**
+
 # Firebase cache directory
 .firebase/
 
