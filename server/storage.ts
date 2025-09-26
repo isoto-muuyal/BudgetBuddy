@@ -31,6 +31,7 @@ export class DatabaseStorage implements IStorage {
  console.log("Fetching user by email:", email);
   try {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    console.log("user ", user); 
     if (!user) {
       console.log("No user found with that email");
     }
