@@ -91,8 +91,9 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
       }
 
       const data = await response.json();
+      console.log('AI response data:', data);
       const analysisText = data.choices[0].message.content;
-
+      console.log("AI analysis text:", analysisText);
       return this.parseAnalysisResponse(analysisText);
     } catch (error) {
       console.error("AI analysis with Hugging Face failed:", error);
@@ -639,6 +640,7 @@ Important:
   }
  // ---- Updated parseAnalysisResponse to use normalization + totals ----
   private parseAnalysisResponse(responseText: string): AIExpenseAnalysis {
+    console.log("Parsing AI response:", responseText);
     try {
       // Extract JSON block (robust to extra text)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -665,6 +667,7 @@ Important:
         expenses,
         recommendations: typeof jsonData.recommendations === 'string' ? jsonData.recommendations : (jsonData.recommendation || "No specific recommendations available."),
       };
+
     } catch (error) {
       console.error("Failed to parse AI response:", error);
       console.log("Raw response:", responseText);
