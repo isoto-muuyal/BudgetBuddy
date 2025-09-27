@@ -91,6 +91,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
+    console.log("Creating budget analysis for user:", insertAnalysis.userId);
+    console.log("Creating budget:", insertAnalysis);
+    
     const [analysis] = await db
       .insert(budgetAnalyses)
       .values([insertAnalysis])

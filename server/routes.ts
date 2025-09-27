@@ -118,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = await fileProcessor.saveFile(req.file.buffer || await fs.readFile(req.file.path), fileName);
 
       // Create budget analysis record
+      console.log('!!! originalname:', req.file.originalname);
       const monthlyIncome = parseFloat(user.monthlyIncome);
       const analysis = await storage.createBudgetAnalysis({
         userId: user.id,
@@ -177,7 +178,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 // Async file processing function
 async function processFileAsync(analysisId: string, filePath: string, monthlyIncome: number) {
   try {
-    console.log(`Starting analysis for ${analysisId}`);
 
     // Extract text from file
     const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));

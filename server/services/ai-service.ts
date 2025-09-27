@@ -119,9 +119,8 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
         response_format: { type: "json_object" }
       });
 
-      console.log('Hugging Face result:', result);
+      console.log('!!Hugging Face result:', result);
       const analysisText = result.choices[0]?.message?.content ?? "";
-      console.log("Hugging Face analysis text:", analysisText);
       return this.parseAnalysisResponse(analysisText);
     } catch (error) {
       console.error("AI analysis with HfInference failed:", error);
