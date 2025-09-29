@@ -1,8 +1,8 @@
 export const config = {
   mailersend: {
-    apiKey: process.env.MAILERSEND_API_KEY || "your_mailersend_api_key",
-    fromEmail: process.env.FROM_EMAIL || "noreply@budgetwise.com",
-    fromName: process.env.FROM_NAME || "BudgetWise",
+    apiKey: process.env.MAILERSEND_API_KEY || "mlsn.b39bfc4d464de08fea1e28aaca9f8d0b04fb18f46528648de7bc70c9f014a993",
+    fromEmail: process.env.FROM_EMAIL || "noreply@muuyal.tech",
+    fromName: process.env.FROM_NAME || "BudgetWise by Muuyal",
   },
   ai: {
     service: process.env.AI_SERVICE || "huggingface", // "ollama" or "huggingface"
