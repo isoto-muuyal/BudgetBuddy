@@ -78,8 +78,9 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
               content: prompt
             }
           ],
-          temperature: 0.3,
-          max_tokens: 2000,
+          temperature: 0.1,
+          max_tokens: 4096,
+          response_mime_type: "application/json",
           stream: false,
         }),
       });
@@ -111,11 +112,18 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
       const result = await this.hfClient.chatCompletion({
         model: this.model,
         messages: [
-          { role: "system", content: "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. Always reply ONLY with valid JSON." },
+          {
+            role: "system", content: "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. " +
+              "Always reply ONLY with valid JSON. You are a financial advisor specializing in budget analysis using the 50/30/20 rule. " +
+              "**DO NOT invent, guess, or assume any financial figures or categories not explicitly mentioned in the user's input and do NOT return more expenses than received.**" +
+              "If uncertain about any categorization, use 'undefined'. And do NOT duplicate records"
+          },
           { role: "user", content: prompt }
         ],
         max_tokens: 4096,
-        temperature: 0.3,
+        temperature: 0.1,
+        repetition_penalty: 1.2,
+        no_repeat_ngram_size: 4,
         response_format: { type: "json_object" }
       });
 
@@ -227,7 +235,7 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     return classifiedExpenses;
   }
 
-// ---- New helper: normalize subcategory/category strings and map to 50/30/20 ----
+  // ---- New helper: normalize subcategory/category strings and map to 50/30/20 ----
   private static SUBCATEGORY_TO_CATEGORY: Record<string, '50%' | '30%' | '20%'> = {
     // Needs (50%)
     housing: '50%',
@@ -260,7 +268,7 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     'deposit': '20%',
   };
 
-   private normalizeExpenses(rawExpenses: any[]): AIExpenseAnalysis['expenses'] {
+  private normalizeExpenses(rawExpenses: any[]): AIExpenseAnalysis['expenses'] {
     const allowedCategories = new Set(['50%', '30%', '20%', 'undefined']);
 
     const normalizeKey = (s: unknown) => (typeof s === 'string' ? s.trim().toLowerCase() : '');
@@ -312,7 +320,7 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
       };
     });
   }
-  
+
   private simpleClassifyTransaction(description: string): '50%' | '30%' | '20%' | 'undefined' {
     const desc = description.toLowerCase();
 
@@ -370,7 +378,7 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     return 'Other';
   }
 
- // ---- New helper: compute totals from normalized expenses ----
+  // ---- New helper: compute totals from normalized expenses ----
   private calculateTotalsFromExpenses(expenses: AIExpenseAnalysis['expenses']): {
     needs: number;
     wants: number;
@@ -637,7 +645,7 @@ Important:
 - If subcategory is Housing then category must be 50%
 `;
   }
- // ---- Updated parseAnalysisResponse to use normalization + totals ----
+
   private parseAnalysisResponse(responseText: string): AIExpenseAnalysis {
     console.log("Parsing AI response:", responseText);
     try {

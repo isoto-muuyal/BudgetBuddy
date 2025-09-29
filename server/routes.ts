@@ -192,7 +192,7 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
       actualWants: aiResult.wants.toString(),
       actualSavings: aiResult.savings.toString(),
       actualUndefined: aiResult.undefined.toString(),
-      expenses: aiResult.expenses,
+      expenses: JSON.stringify(aiResult.expenses),
       recommendations: aiResult.recommendations,
       analysisStatus: "completed",
     });

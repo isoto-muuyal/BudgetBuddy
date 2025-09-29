@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
+import { encrypt, decrypt } from "./encryption-util";
 import { users, budgetAnalyses, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -83,7 +84,18 @@ export class DatabaseStorage implements IStorage {
 
   async getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined> {
     const [analysis] = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.id, id));
-    return analysis || undefined;
+    
+    if (!analysis) return undefined;
+
+    return { 
+      ...analysis,
+      expenses: analysis.expenses 
+          ? JSON.parse(decrypt(analysis.expenses)) 
+          : null,
+      recommendations: analysis.recommendations 
+        ? decrypt(analysis.recommendations) 
+        : null,
+    };
   }
 
   async getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
@@ -91,12 +103,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
-    console.log("Creating budget analysis for user:", insertAnalysis.userId);
     console.log("Creating budget:", insertAnalysis);
-    
+
+     const encryptedExpenses = insertAnalysis.expenses
+    ? encrypt(JSON.stringify(insertAnalysis.expenses))
+    : null;
+
+  const encryptedRecommendations = insertAnalysis.recommendations
+    ? encrypt(insertAnalysis.recommendations)
+    : null;
+
     const [analysis] = await db
       .insert(budgetAnalyses)
-      .values([insertAnalysis])
+      .values({
+        ...insertAnalysis,
+        expenses: encryptedExpenses,
+        recommendations: encryptedRecommendations,
+    })
       .returning();
     return analysis;
   }

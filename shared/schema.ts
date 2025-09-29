@@ -28,12 +28,7 @@ export const budgetAnalyses = pgTable("budget_analyses", {
   actualWants: decimal("actual_wants", { precision: 10, scale: 2 }),
   actualSavings: decimal("actual_savings", { precision: 10, scale: 2 }),
   actualUndefined: decimal("actual_undefined", { precision: 10, scale: 2 }),
-  expenses: jsonb("expenses").$type<Array<{
-    description: string;
-    amount: number;
-    category: '50%' | '30%' | '20%' | 'undefined';
-    subcategory?: string;
-  }>>(),
+  expenses: text("expenses"), // encrypted JSON string
   recommendations: text("recommendations"),
   analysisStatus: text("analysis_status").default("pending"), // pending, completed, failed
 });
