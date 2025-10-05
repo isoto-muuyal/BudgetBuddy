@@ -15,7 +15,7 @@ export class EmailService {
 
   async sendVerificationEmail(email: string, fullName: string, verificationToken: string) {
     const recipient = new Recipient(email, fullName);
-    
+    console.log("Sending verification email to:", email);
     const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5001"}/verify-email?token=${verificationToken}`;
 
     const emailParams = new EmailParams()
@@ -90,6 +90,85 @@ export class EmailService {
       throw error;
     }
   }
+
+  async sendPasswordResetEmail(email: string, fullName: string, resetToken: string) {
+    const recipient = new Recipient(email, fullName);
+
+    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5000"}/reset-password?token=${resetToken}`;
+
+    const emailParams = new EmailParams()
+      .setFrom(this.sender)
+      .setTo([recipient])
+      .setSubject("Reset Your BudgetWise Password")
+      .setHtml(`
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(to right, #3B82F6, #8B5CF6); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Password Reset Request</h1>
+          </div>
+          
+          <div style="padding: 30px; background: #f9fafb;">
+            <h2 style="color: #374151;">Hi ${fullName},</h2>
+            
+            <p style="color: #6b7280; line-height: 1.6;">
+              We received a request to reset your BudgetWise password. Click the button below to create a new password:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" 
+                 style="background: linear-gradient(to right, #3B82F6, #8B5CF6); 
+                        color: white; 
+                        padding: 12px 24px; 
+                        text-decoration: none; 
+                        border-radius: 8px; 
+                        display: inline-block;
+                        font-weight: 600;">
+                Reset Password
+              </a>
+            </div>
+            
+            <p style="color: #6b7280; line-height: 1.6; font-size: 14px;">
+              If the button doesn't work, you can copy and paste this link into your browser:
+              <br>
+              <a href="${resetUrl}" style="color: #3B82F6;">${resetUrl}</a>
+            </p>
+            
+            <p style="color: #6b7280; line-height: 1.6; font-size: 14px;">
+              This password reset link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+            </p>
+          </div>
+          
+          <div style="background: #374151; padding: 20px; text-align: center;">
+            <p style="color: #9ca3af; margin: 0; font-size: 14px;">
+              © 2025 BudgetWise. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `)
+      .setText(`
+        Password Reset Request
+        
+        Hi ${fullName},
+        
+        We received a request to reset your BudgetWise password. Click the following link to create a new password:
+        
+        ${resetUrl}
+        
+        This password reset link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+        
+        Best regards,
+        The BudgetWise Team
+      `);
+
+    try {
+      const response = await this.mailerSend.email.send(emailParams);
+      console.log("Password reset email sent successfully:", response);
+      return response;
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const emailService = new EmailService();

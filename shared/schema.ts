@@ -12,6 +12,8 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").default(false),
   verificationToken: text("verification_token"),
   createdAt: timestamp("created_at").defaultNow(),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpiry: timestamp("password_reset_expiry"),
 });
 
 export const budgetAnalyses = pgTable("budget_analyses", {
@@ -61,6 +63,15 @@ export const insertBudgetAnalysisSchema = createInsertSchema(budgetAnalyses).omi
   analysisStatus: true,
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  newPassword: z.string().min(6, "Password must be at least 6 characters long."),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;
@@ -68,3 +79,5 @@ export type SignupUser = z.infer<typeof signupSchema>;
 export type IncomeInput = z.infer<typeof incomeSchema>;
 export type BudgetAnalysis = typeof budgetAnalyses.$inferSelect;
 export type InsertBudgetAnalysis = z.infer<typeof insertBudgetAnalysisSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

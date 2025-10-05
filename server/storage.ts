@@ -19,6 +19,11 @@ export interface IStorage {
   getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
   createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<BudgetAnalysis>;
   updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis>;
+
+  // Password reset methods
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+  setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
+  resetPassword(userId: string, newPassword: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -135,6 +140,25 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Budget analysis not found");
     }
     return analysis;
+  }
+
+    async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.passwordResetToken, token));
+    return user || undefined;
+  }
+
+  async setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({ passwordResetToken: token, passwordResetExpiry: expiry })
+      .where(eq(users.id, userId));
+  }
+
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: newPassword, passwordResetToken: null, passwordResetExpiry: null })
+      .where(eq(users.id, userId));
   }
 }
 

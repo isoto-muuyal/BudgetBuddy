@@ -15,6 +15,8 @@ import Privacy from "@/pages/privacy";
 import Navigation from "@/components/nav";
 import LoadingOverlay from "@/components/loading-overlay";
 import NotFound from "@/pages/not-found";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 
 function Router() {
   return (
@@ -28,6 +30,8 @@ function Router() {
         <Route path="/budget" component={Budget} />
         <Route path="/upload" component={Upload} />
         <Route path="/results/:id" component={Results} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/about" component={About} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />

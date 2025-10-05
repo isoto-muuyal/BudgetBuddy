@@ -1,9 +1,20 @@
 import 'dotenv/config'; 
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+app.use(cors({
+  origin: process.env.NODE_ENV === "production" 
+    ? [process.env.FRONTEND_URL || "https://budgetwise.muuyal.tech", /\.muuyal\.tech$/]
+    : "*",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

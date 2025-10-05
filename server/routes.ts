@@ -8,7 +8,7 @@ import { authService } from "./services/auth";
 import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
-import { loginSchema, signupSchema, incomeSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
 import { config } from "./config";
 
 // Configure multer for file uploads
@@ -63,6 +63,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await authService.verifyEmail(token);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => { 
+    try {
+      const data = forgotPasswordSchema.parse(req.body);
+      const result = await authService.forgotPassword(data);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const data = resetPasswordSchema.parse(req.body);
+      const result = await authService.resetPassword(data);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

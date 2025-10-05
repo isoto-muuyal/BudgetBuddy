@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { config } from "../config";
 import { storage } from "../storage";
 import { emailService } from "./email";
-import type { SignupUser, LoginUser } from "@shared/schema";
+import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
 export class AuthService {
   async signup(userData: SignupUser) {
@@ -81,6 +81,44 @@ export class AuthService {
     await storage.verifyUserEmail(user.id);
     
     return { message: "Email verified successfully" };
+  }
+
+    async forgotPassword(data: ForgotPasswordInput) {
+    const user = await storage.getUserByEmail(data.email);
+    if (!user) {
+      return { message: "If an account exists with this email, you will receive a password reset link." };
+    }
+
+    const resetToken = randomBytes(32).toString("hex");
+    const expiry = new Date(Date.now() + 3600000); // 1 hour
+
+    await storage.setPasswordResetToken(user.id, resetToken, expiry);
+
+    try {
+      await emailService.sendPasswordResetEmail(user.email, user.fullName, resetToken);
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+    }
+
+    return { message: "If an account exists with this email, you will receive a password reset link." };
+  }
+
+  async resetPassword(data: ResetPasswordInput) {
+    const user = await storage.getUserByPasswordResetToken(data.token);
+    if (!user) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    if (user.passwordResetExpiry && new Date() > new Date(user.passwordResetExpiry)) {
+      throw new Error("Reset token has expired");
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(data.newPassword, saltRounds);
+
+    await storage.resetPassword(user.id, hashedPassword);
+
+    return { message: "Password reset successfully" };
   }
 }
 

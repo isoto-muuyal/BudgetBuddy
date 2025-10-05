@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Bot, Download, Upload, FileText, Calendar } from "lucide-react";
+import { BarChart3, Bot, Download, Upload, FileText, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,10 @@ export default function Results({ params }: ResultsProps) {
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
     enabled: !!analysisId,
+    refetchInterval: (query) => {
+      // Poll every 5 seconds if analysis is still pending
+      return query.state.data?.analysisStatus === "pending" ? 5000 : false;
+    },
   });
 
   const { data: analysisHistory, isLoading: historyLoading } = useQuery<any[]>({
@@ -74,6 +78,8 @@ export default function Results({ params }: ResultsProps) {
   const actualNeedsPercent = analysis.actualNeeds ? Math.round((parseFloat(analysis.actualNeeds) / monthlyIncome) * 100) : 0;
   const actualWantsPercent = analysis.actualWants ? Math.round((parseFloat(analysis.actualWants) / monthlyIncome) * 100) : 0;
   const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
+  const isProcessing = analysis.analysisStatus === "pending";
+  const hasFailed = analysis.analysisStatus === "failed";
 
   const getCategoryBadge = (category: string) => {
     switch (category) {
@@ -157,41 +163,68 @@ const handleDownloadReport = async () => {
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">Your Current Spending</h3>
-              <div className="space-y-2">
-                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-red-800">Needs</span>
-                    <span className="font-semibold text-red-800" data-testid="text-actual-needs-percent">
-                      {actualNeedsPercent}%
-                    </span>
+              {isProcessing ? (
+                <div className="space-y-2">
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+                      <span className="text-sm text-blue-800">Analyzing...</span>
+                    </div>
                   </div>
-                  <div className="text-xs text-red-600" data-testid="text-actual-needs-amount">
-                    ${analysis.actualNeeds}
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+                      <span className="text-sm text-blue-800">Analyzing...</span>
+                    </div>
                   </div>
-                </div>
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-orange-800">Wants</span>
-                    <span className="font-semibold text-orange-800" data-testid="text-actual-wants-percent">
-                      {actualWantsPercent}%
-                    </span>
-                  </div>
-                  <div className="text-xs text-orange-600" data-testid="text-actual-wants-amount">
-                    ${analysis.actualWants}
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+                      <span className="text-sm text-blue-800">Analyzing...</span>
+                    </div>
                   </div>
                 </div>
-                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-red-800">Savings</span>
-                    <span className="font-semibold text-red-800" data-testid="text-actual-savings-percent">
-                      {actualSavingsPercent}%
-                    </span>
+              ) : hasFailed ? (
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <p className="text-sm text-red-800 text-center">Analysis failed. Please try uploading your file again.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-red-800">Needs</span>
+                      <span className="font-semibold text-red-800" data-testid="text-actual-needs-percent">
+                        {actualNeedsPercent}%
+                      </span>
+                    </div>
+                    <div className="text-xs text-red-600" data-testid="text-actual-needs-amount">
+                      ${analysis.actualNeeds}
+                    </div>
                   </div>
-                  <div className="text-xs text-red-600" data-testid="text-actual-savings-amount">
-                    ${analysis.actualSavings}
+                  <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-orange-800">Wants</span>
+                      <span className="font-semibold text-orange-800" data-testid="text-actual-wants-percent">
+                        {actualWantsPercent}%
+                      </span>
+                    </div>
+                    <div className="text-xs text-orange-600" data-testid="text-actual-wants-amount">
+                      ${analysis.actualWants}
+                    </div>
+                  </div>
+                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-red-800">Savings</span>
+                      <span className="font-semibold text-red-800" data-testid="text-actual-savings-percent">
+                        {actualSavingsPercent}%
+                      </span>
+                    </div>
+                    <div className="text-xs text-red-600" data-testid="text-actual-savings-amount">
+                      ${analysis.actualSavings}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div>
@@ -223,7 +256,19 @@ const handleDownloadReport = async () => {
           </div>
 
           {/* AI Recommendations */}
-          {analysis.recommendations && (
+          {isProcessing && (
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <Bot className="text-brand-blue mr-2" />
+                AI Recommendations
+              </h3>
+              <div className="flex items-center text-sm text-gray-700">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                AI is analyzing your expenses and generating personalized recommendations...
+              </div>
+            </div>
+          )}
+          {!isProcessing && analysis.recommendations && (
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                 <Bot className="text-brand-blue mr-2" />
@@ -236,7 +281,16 @@ const handleDownloadReport = async () => {
           )}
 
           {/* Detailed Expense Breakdown */}
-          {analysis.expenses && analysis.expenses.length > 0 && (
+          {isProcessing && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
+              <div className="bg-gray-50 p-6 rounded-lg text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">Processing your expenses...</p>
+              </div>
+            </div>
+          )}
+          {!isProcessing && analysis.expenses && analysis.expenses.length > 0 && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
               <ScrollArea className="h-60" data-testid="scroll-expenses">
@@ -278,8 +332,8 @@ const handleDownloadReport = async () => {
             </Button>
             <Button
               onClick={handleDownloadReport}
-              disabled={isGeneratingPDF || !userProfile}
-              className="flex-1 bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+              disabled={isGeneratingPDF || !userProfile || isProcessing}
+              className="flex-1 bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-download"
             >
               <Download className="w-4 h-4 mr-2" />
