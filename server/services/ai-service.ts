@@ -676,7 +676,7 @@ Important:
       };
 
     } catch (error) {
-      console.error("Failed to parse AI response:", error);
+      console.error("Failed to parse AI response: " + responseText, error);
       console.log("Raw response:", responseText);
 
       // Return a fallback response

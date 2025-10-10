@@ -1,6 +1,5 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-
 import * as schema from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -11,19 +10,18 @@ console.log("Connecting to database:", process.env.DATABASE_URL);
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 3,            // small pool: Neon prefers few connections
-  idleTimeoutMillis: 5000, // release idle clients quickly
-  connectionTimeoutMillis: 10000, // fail fast if cannot connect
+  ssl: {
+    rejectUnauthorized: false, // needed for Neon (self-signed certs)
+  },
 });
 
-(async () => {
-  try {
-    await pool.query('SELECT 1');
-    console.log("Connected to database");
-  } catch (err) {
-    console.error("Database connection error:", err);
-  }
-})();
+pool.connect()
+.then( client => {
+  console.log("Connected to database");
+  return client;
+}).catch( err => {
+  console.error("Database connection error:", err);
+  throw err;
+});
 
 export const db = drizzle(pool, { schema });
