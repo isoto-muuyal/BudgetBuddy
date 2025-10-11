@@ -1,6 +1,7 @@
 import { config } from "../config";
 import { pipeline, env } from '@huggingface/transformers';
 import { InferenceClient } from '@huggingface/inference';
+import fs from 'fs';
 
 export interface AIExpenseAnalysis {
   needs: number;
@@ -676,8 +677,13 @@ Important:
       };
 
     } catch (error) {
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const path = `./failed_ai_responses/ai_response_${timestamp}.txt`;
+      fs.mkdirSync('./failed_ai_responses', { recursive: true });
+      fs.writeFileSync(path, responseText);
+      console.log(`Saved failed AI response to ${path}`);
       console.error("Failed to parse AI response: " + responseText, error);
-      console.log("Raw response:", responseText);
 
       // Return a fallback response
       return {
