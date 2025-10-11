@@ -103,39 +103,49 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
     }
   }
 
-  // Analyze using Hugging Face Inference API with finance-Llama3-8B model
-  private async analyzeWithHuggingFace(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
-    const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
+// Analyze using Hugging Face Inference API with finance-Llama3-8B model
+private async analyzeWithHuggingFace(textContent: string, monthlyIncome: number): Promise<AIExpenseAnalysis> {
+  const prompt = this.buildAnalysisPrompt(textContent, monthlyIncome);
 
+  try {
+    console.log("Sending prompt to Hugging Face with InferenceClient");
+
+    const result = await this.hfClient.chatCompletion({
+      model: this.model, // e.g. "HuggingFaceH4/zephyr-7b-beta" or your own
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. " +
+            "Always reply ONLY with valid JSON. Do NOT invent, guess, or assume financial figures " +
+            "not explicitly mentioned in the user's input, and do NOT return more expenses than received. " +
+            "If uncertain about any categorization, use 'undefined'. Do NOT duplicate records."
+        },
+        { role: "user", content: prompt }
+      ],
+      // Keep it simple — only supported fields
+      temperature: 0.2,
+      max_tokens: 1024
+    });
+
+    console.log("✅ Hugging Face result received");
+    const analysisText = result.choices?.[0]?.message?.content ?? "";
+
+    // Save raw output in case parsing fails (for debugging)
     try {
-      console.log("Sending prompt to Hugging Face with HfInference client");
-      // Use the textGeneration method for LLMs
-      const result = await this.hfClient.chatCompletion({
-        model: this.model,
-        messages: [
-          {
-            role: "system", content: "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. " +
-              "Always reply ONLY with valid JSON. You are a financial advisor specializing in budget analysis using the 50/30/20 rule. " +
-              "**DO NOT invent, guess, or assume any financial figures or categories not explicitly mentioned in the user's input and do NOT return more expenses than received.**" +
-              "If uncertain about any categorization, use 'undefined'. And do NOT duplicate records"
-          },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 4096,
-        temperature: 0.1,
-        repetition_penalty: 1.2,
-        no_repeat_ngram_size: 4,
-        response_format: { type: "json_object" }
-      });
-
-      console.log('!!Hugging Face result:', result);
-      const analysisText = result.choices[0]?.message?.content ?? "";
       return this.parseAnalysisResponse(analysisText);
-    } catch (error) {
-      console.error("AI analysis with HfInference failed:", error);
-      throw new Error("Failed to analyze expenses with Hugging Face");
+    } catch (parseErr) {
+      console.error("⚠️ JSON parse failed, saving raw response for inspection.");
+      await fs.promises.writeFile("hf_raw_response.json", analysisText, "utf-8");
+      throw parseErr;
     }
+
+  } catch (error: any) {
+    console.error("❌ AI analysis with HfInference failed:", error.response?.body || error.message);
+    await fs.promises.writeFile("hf_error_log.json", JSON.stringify(error, null, 2), "utf-8");
+    throw new Error("Failed to analyze expenses with Hugging Face");
   }
+}
 
   private extractTransactions(textContent: string): Array<{ description: string, amount: number }> {
     const lines = textContent.split('\n').filter(line => line.trim());
