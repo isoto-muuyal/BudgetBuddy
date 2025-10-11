@@ -660,13 +660,16 @@ Important:
 
       // Ensure we have an array (defensive)
       const rawExpenses = Array.isArray(jsonData.expenses) ? jsonData.expenses : [];
+      console.log("Extracted raw expenses:", rawExpenses);
 
       // Normalize categories and subcategories
       const expenses = this.normalizeExpenses(rawExpenses);
+      console.log("Normalized expenses:", expenses);
 
       // Calculate totals from normalized expenses
       const totals = this.calculateTotalsFromExpenses(expenses);
-
+      console.log("Calculated totals:", totals);
+      
       return {
         needs: totals.needs,
         wants: totals.wants,
