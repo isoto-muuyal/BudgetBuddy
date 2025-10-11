@@ -131,8 +131,14 @@ ${this.buildAnalysisPrompt(textContent, monthlyIncome)}
       console.log('!!Hugging Face result:', result);
       const analysisText = result.choices[0]?.message?.content ?? "";
       return this.parseAnalysisResponse(analysisText);
-    } catch (error) {
-      console.error("AI analysis with HfInference failed:", error);
+    } catch (error: any) {
+      if (error.httpResponse) {
+        console.error("❌ HTTP error status:", error.httpResponse.status);
+        console.error("❌ HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      } else {
+        console.error("❌ AI analysis with HfInference failed:", error);
+      }
+
       throw new Error("Failed to analyze expenses with Hugging Face");
     }
   }
@@ -664,7 +670,7 @@ Important:
         .trim();
 
       const jsonData = JSON.parse(cleaned);
-      
+
       // Ensure we have an array (defensive)
       const rawExpenses = Array.isArray(jsonData.expenses) ? jsonData.expenses : [];
       console.log("Extracted raw expenses:", rawExpenses);
