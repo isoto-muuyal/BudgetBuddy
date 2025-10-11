@@ -656,8 +656,15 @@ Important:
         throw new Error("No valid JSON found in AI response");
       }
 
-      const jsonData = JSON.parse(jsonMatch[0].trim());
+      let cleaned = jsonMatch[0]
+        // remove non-printable control characters except line breaks, tabs if you want
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+        // normalize weird spacing (optional)
+        .replace(/\s+/g, " ")
+        .trim();
 
+      const jsonData = JSON.parse(cleaned);
+      
       // Ensure we have an array (defensive)
       const rawExpenses = Array.isArray(jsonData.expenses) ? jsonData.expenses : [];
       console.log("Extracted raw expenses:", rawExpenses);
@@ -669,7 +676,7 @@ Important:
       // Calculate totals from normalized expenses
       const totals = this.calculateTotalsFromExpenses(expenses);
       console.log("Calculated totals:", totals);
-      
+
       return {
         needs: totals.needs,
         wants: totals.wants,
