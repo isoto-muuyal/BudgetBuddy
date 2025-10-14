@@ -88,6 +88,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined> {
+    try {
+      console.log("BudgetAnalysis table: ", budgetAnalyses);
+      console.log("BudgetAnalysis id column: ", budgetAnalyses.id);
+      console.log("BudgetAnalysis id: ", id);
     const [analysis] = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.id, id));
     
     if (!analysis) return undefined;
@@ -101,6 +105,9 @@ export class DatabaseStorage implements IStorage {
         ? decrypt(analysis.recommendations) 
         : null,
     };
+    } catch (err: any) {
+      console.log("! Error fetching data: ", err)
+    }
   }
 
   async getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {

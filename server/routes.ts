@@ -166,9 +166,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const analysisId = req.params.id;
-      console.log("analysis ID: " + analysisId);
+      console.log("Analysis ID: " + analysisId);
       const analysis = await storage.getBudgetAnalysis(analysisId);
       console.log("Analysis: " + analysis);
+
       if (!analysis) {
         return res.status(404).json({ message: "Analysis not found" });
       }
