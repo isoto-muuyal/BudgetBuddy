@@ -100,7 +100,7 @@ export default function Budget() {
             className="w-full bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
             data-testid="button-upload"
           >
-            Upload Bank Statement
+            Upload expenses file
           </Button>
         </CardContent>
       </Card>
