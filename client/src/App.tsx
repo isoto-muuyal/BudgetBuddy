@@ -17,6 +17,8 @@ import LoadingOverlay from "@/components/loading-overlay";
 import NotFound from "@/pages/not-found";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import History from "@/pages/history";
+
 
 function Router() {
   return (
@@ -32,6 +34,7 @@ function Router() {
         <Route path="/results/:id" component={Results} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/history" component={History} />
         <Route path="/about" component={About} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />

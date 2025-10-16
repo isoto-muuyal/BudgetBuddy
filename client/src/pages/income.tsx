@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { DollarSign } from "lucide-react";
+import { DollarSign, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -128,6 +128,15 @@ export default function Income() {
                 data-testid="button-calculate"
               >
                 {incomeMutation.isPending ? "Calculating..." : "Calculate Budget"}
+              </Button> 
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full py-3 rounded-lg font-medium mt-3"
+                onClick={() => setLocation("/history")}
+                data-testid="button-view-history">
+                  <History className="w-4 h-4 mr-2" />
+                  View Previous Reports
               </Button>
             </form>
           </Form>

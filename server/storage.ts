@@ -1,60 +1,41 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { encrypt, decrypt } from "./encryption-util";
 import { users, budgetAnalyses, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { encrypt, decrypt } from "./utils/encryption";
 
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser & { verificationToken?: string }): Promise<User>;
   updateUserIncome(userId: string, monthlyIncome: string): Promise<User>;
   verifyUserEmail(userId: string): Promise<void>;
+  setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
+  resetPassword(userId: string, newPassword: string): Promise<void>;
 
   // Budget analysis methods
   getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined>;
   getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
   createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<BudgetAnalysis>;
   updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis>;
-
-  // Password reset methods
-  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
-  setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
-  resetPassword(userId: string, newPassword: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    console.log("Fetching user by ID:", id);
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
- console.log("Fetching user by email:", email);
-  try {
     const [user] = await db.select().from(users).where(eq(users.email, email));
-    console.log("user ", user); 
-    if (!user) {
-      console.log("No user found with that email");
-    }
     return user || undefined;
-  } catch (err: any) {
-    if (err.code === "42P01") {
-      // Postgres error code for "undefined_table"
-      console.error("❌ Table 'users' does not exist!");
-    } else {
-      console.error("Database error in getUserByEmail:", err);
-    }
-    throw err; // rethrow so your app can handle it
-  }
   }
 
   async getUserByVerificationToken(token: string): Promise<User | undefined> {
-    console.log("Fetching user by verification token:", token);
     const [user] = await db.select().from(users).where(eq(users.verificationToken, token));
     return user || undefined;
   }
@@ -87,69 +68,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
-  async getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined> {
-    try {
-      console.log("BudgetAnalysis table: ", budgetAnalyses);
-      console.log("BudgetAnalysis id column: ", budgetAnalyses.id);
-      console.log("BudgetAnalysis id: ", id);
-    const [analysis] = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.id, id));
-    
-    if (!analysis) return undefined;
-
-    return { 
-      ...analysis,
-      expenses: analysis.expenses 
-          ? JSON.parse(decrypt(analysis.expenses)) 
-          : null,
-      recommendations: analysis.recommendations 
-        ? decrypt(analysis.recommendations) 
-        : null,
-    };
-    } catch (err: any) {
-      console.log("! Error fetching data: ", err)
-    }
-  }
-
-  async getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
-    return await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.userId, userId));
-  }
-
-  async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
-    console.log("Creating budget:", insertAnalysis);
-
-     const encryptedExpenses = insertAnalysis.expenses
-    ? encrypt(JSON.stringify(insertAnalysis.expenses))
-    : null;
-
-  const encryptedRecommendations = insertAnalysis.recommendations
-    ? encrypt(insertAnalysis.recommendations)
-    : null;
-
-    const [analysis] = await db
-      .insert(budgetAnalyses)
-      .values({
-        ...insertAnalysis,
-        expenses: encryptedExpenses,
-        recommendations: encryptedRecommendations,
-    })
-      .returning();
-    return analysis;
-  }
-
-  async updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis> {
-    const [analysis] = await db
-      .update(budgetAnalyses)
-      .set(updates)
-      .where(eq(budgetAnalyses.id, id))
-      .returning();
-    
-    if (!analysis) {
-      throw new Error("Budget analysis not found");
-    }
-    return analysis;
-  }
-
-    async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.passwordResetToken, token));
     return user || undefined;
   }
@@ -166,6 +85,76 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ password: newPassword, passwordResetToken: null, passwordResetExpiry: null })
       .where(eq(users.id, userId));
+  }
+
+  async getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined> {
+    const [analysis] = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.id, id));
+    if (!analysis) return undefined;
+    
+    // Decrypt expenses and recommendations
+    return {
+      ...analysis,
+      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+    };
+  }
+
+  async getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
+    const analyses = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.userId, userId));
+    
+    // Decrypt expenses and recommendations for each analysis
+    return analyses.map(analysis => ({
+      ...analysis,
+      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+    }));
+  }
+
+  async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
+    // Encrypt expenses and recommendations before storing
+    const encryptedAnalysis = {
+      ...insertAnalysis,
+      expenses: insertAnalysis.expenses ? JSON.parse(encrypt(JSON.stringify(insertAnalysis.expenses))) : insertAnalysis.expenses,
+      recommendations: insertAnalysis.recommendations ? encrypt(insertAnalysis.recommendations) : insertAnalysis.recommendations,
+    };
+    
+    const [analysis] = await db
+      .insert(budgetAnalyses)
+      .values([encryptedAnalysis])
+      .returning();
+    
+    // Return decrypted version
+    return {
+      ...analysis,
+      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+    };
+  }
+
+  async updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis> {
+    // Encrypt expenses and recommendations if they're being updated
+    const encryptedUpdates = {
+      ...updates,
+      expenses: updates.expenses ? JSON.parse(encrypt(JSON.stringify(updates.expenses))) : updates.expenses,
+      recommendations: updates.recommendations ? encrypt(updates.recommendations) : updates.recommendations,
+    };
+    
+    const [analysis] = await db
+      .update(budgetAnalyses)
+      .set(encryptedUpdates)
+      .where(eq(budgetAnalyses.id, id))
+      .returning();
+    
+    if (!analysis) {
+      throw new Error("Budget analysis not found");
+    }
+    
+    // Return decrypted version
+    return {
+      ...analysis,
+      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+    };
   }
 }
 

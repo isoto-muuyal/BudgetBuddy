@@ -20,13 +20,13 @@ export default function Results({ params }: ResultsProps) {
   const analysisId = params.id;
   const { toast } = useToast();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  
+
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
     enabled: !!analysisId,
     refetchInterval: (query) => {
-      // Poll every 5 seconds if analysis is still pending
-      return query.state.data?.analysisStatus === "pending" ? 5000 : false;
+      // Poll every 3 seconds if analysis is still pending
+      return query.state.data?.analysisStatus === "pending" ? 3000 : false;
     },
   });
 
@@ -75,11 +75,11 @@ export default function Results({ params }: ResultsProps) {
   }
 
   const monthlyIncome = parseFloat(analysis.monthlyIncome);
+  const isProcessing = analysis.analysisStatus === "pending";
+  const hasFailed = analysis.analysisStatus === "failed";
   const actualNeedsPercent = analysis.actualNeeds ? Math.round((parseFloat(analysis.actualNeeds) / monthlyIncome) * 100) : 0;
   const actualWantsPercent = analysis.actualWants ? Math.round((parseFloat(analysis.actualWants) / monthlyIncome) * 100) : 0;
   const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
-  const isProcessing = analysis.analysisStatus === "pending";
-  const hasFailed = analysis.analysisStatus === "failed";
 
   const getCategoryBadge = (category: string) => {
     switch (category) {
@@ -94,7 +94,7 @@ export default function Results({ params }: ResultsProps) {
     }
   };
 
-const handleDownloadReport = async () => {
+  const handleDownloadReport = async () => {
     if (!analysis || !userProfile) {
       toast({
         title: "Error",
@@ -126,6 +126,7 @@ const handleDownloadReport = async () => {
           uploadDate: analysis.uploadDate,
         },
       };
+
       await generateAndDownloadPDF(reportData);
       toast({
         title: "Success",
@@ -142,7 +143,7 @@ const handleDownloadReport = async () => {
       setIsGeneratingPDF(false);
     }
   };
-  
+
   return (
     <div className="max-w-md mx-auto p-4 pt-8">
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-results">
@@ -194,33 +195,33 @@ const handleDownloadReport = async () => {
                     <div className="flex justify-between">
                       <span className="text-sm text-red-800">Needs</span>
                       <span className="font-semibold text-red-800" data-testid="text-actual-needs-percent">
-                        {actualNeedsPercent}%
+                        {analysis.actualNeeds ? `${actualNeedsPercent}%` : "Calculating..."}
                       </span>
                     </div>
                     <div className="text-xs text-red-600" data-testid="text-actual-needs-amount">
-                      ${analysis.actualNeeds}
+                      {analysis.actualNeeds ? `$${analysis.actualNeeds}` : "Calculating..."}
                     </div>
                   </div>
                   <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                     <div className="flex justify-between">
                       <span className="text-sm text-orange-800">Wants</span>
                       <span className="font-semibold text-orange-800" data-testid="text-actual-wants-percent">
-                        {actualWantsPercent}%
+                        {analysis.actualWants ? `${actualWantsPercent}%` : "Calculating..."}
                       </span>
                     </div>
                     <div className="text-xs text-orange-600" data-testid="text-actual-wants-amount">
-                      ${analysis.actualWants}
+                      {analysis.actualWants ? `$${analysis.actualWants}` : "Calculating..."}
                     </div>
                   </div>
                   <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                     <div className="flex justify-between">
                       <span className="text-sm text-red-800">Savings</span>
                       <span className="font-semibold text-red-800" data-testid="text-actual-savings-percent">
-                        {actualSavingsPercent}%
+                        {analysis.actualSavings ? `${actualSavingsPercent}%` : "Calculating..."}
                       </span>
                     </div>
                     <div className="text-xs text-red-600" data-testid="text-actual-savings-amount">
-                      ${analysis.actualSavings}
+                      {analysis.actualSavings ? `$${analysis.actualSavings}` : "Calculating..."}
                     </div>
                   </div>
                 </div>
