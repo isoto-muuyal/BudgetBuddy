@@ -10,9 +10,10 @@ console.log("Connecting to database:", process.env.DATABASE_URL);
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false, // needed for Neon (self-signed certs)
-  },
+  ssl: false,
+  // {
+   // rejectUnauthorized: false, // needed for Neon (self-signed certs) 
+    //},
 });
 
 pool.connect()
