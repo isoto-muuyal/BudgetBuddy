@@ -6,6 +6,19 @@ export const config = {
   },
   ai: {
     service: process.env.AI_SERVICE || "huggingface", // "ollama" or "huggingface"
+    // Categorization API - optimized for structured JSON output
+    categorization: {
+      baseUrl: process.env.AI_CATEGORIZATION_BASE_URL || "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+      model: process.env.AI_CATEGORIZATION_MODEL || "mistralai/Mistral-7B-Instruct-v0.2",
+      accessToken: process.env.AI_CATEGORIZATION_ACCESS_TOKEN || process.env.AI_ACCESS_TOKEN || "",
+    },
+    // Recommendations API - optimized for analysis and recommendations
+    recommendations: {
+      baseUrl: process.env.AI_RECOMMENDATIONS_BASE_URL || "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct",
+      model: process.env.AI_RECOMMENDATIONS_MODEL || "meta-llama/Llama-3.1-8B-Instruct",
+      accessToken: process.env.AI_RECOMMENDATIONS_ACCESS_TOKEN || process.env.AI_ACCESS_TOKEN || "",
+    },
+    // Legacy support (deprecated)
     baseUrl: process.env.AI_BASE_URL || "https://router.huggingface.co/featherless-ai/v1/completions",
     model: process.env.AI_MODEL || "instruction-pretrain/finance-Llama3-8B",
     accessToken: process.env.AI_ACCESS_TOKEN || "",

@@ -121,8 +121,20 @@ dist
 .upload/**
 .uploads/
 .uploads/**
+uploads/
+uploads/**
 .training_data/
 .training_data/**
+training_data/
+training_data/**
+
+# macOS system files
+.DS_Store
+.DS_Store?
+
+# Log files
+log.txt
+*.log.txt
 
 # Firebase cache directory
 .firebase/
