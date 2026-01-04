@@ -1,0 +1,32 @@
+// PM2 Ecosystem Configuration
+// Copy this file to ecosystem.config.js and customize for your environment
+// Then start with: pm2 start ecosystem.config.js
+
+module.exports = {
+  apps: [{
+    name: 'budgetbuddy',
+    script: 'npm',
+    args: 'start',
+    cwd: '/home/ubuntu/BudgetBuddy', // Update with your app directory
+    instances: 1, // Run single instance, or 'max' for all CPUs
+    exec_mode: 'fork', // 'fork' or 'cluster'
+    watch: false, // Set to true for development
+    max_memory_restart: '1G', // Restart if memory exceeds 1GB
+    env: {
+      NODE_ENV: 'production',
+      PORT: 5003,
+      // Add your environment variables here
+      // AI_ACCESS_TOKEN: 'your-token',
+      // MONGODB_URI: 'your-mongodb-uri',
+      // JWT_SECRET: 'your-jwt-secret',
+    },
+    error_file: './logs/pm2-error.log',
+    out_file: './logs/pm2-out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    merge_logs: true,
+    autorestart: true,
+    max_restarts: 10,
+    min_uptime: '10s',
+  }]
+};
+

@@ -136,6 +136,11 @@ training_data/**
 log.txt
 *.log.txt
 
+# PM2
+ecosystem.config.js
+logs/
+pm2-*.log
+
 # Firebase cache directory
 .firebase/
 
