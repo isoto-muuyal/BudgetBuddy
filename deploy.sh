@@ -37,12 +37,15 @@ echo -e "${YELLOW}Building and restarting containers...${NC}"
 # -d runs it in the background
 docker compose up -d --build
 
-# 5. Cleanup (Professional Move)
-# This removes old "dangling" images to save space on your EC2
+# 5. runs the migration inside container
+echo -e "${YELLOW}Running database migrations...${NC}"
+docker exec budgetbuddy_app npm run db:push
+
+# 6. Cleanup 
 echo -e "${YELLOW}Cleaning up old images...${NC}"
 docker image prune -f
 
-# 6. Show status
+# 7. Show status
 echo -e "${GREEN}Deployment completed!${NC}"
 docker ps --filter "name=budgetbuddy_app"
 
