@@ -1,0 +1,26 @@
+# Stage 1: Build the React frontend
+FROM node:20-alpine AS build-stage
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+# This creates the /dist folder with your frontend build
+RUN npm run build 
+
+# Stage 2: Production environment
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=build-stage /app/package*.json ./
+# Install production dependencies only
+RUN npm install --omit=dev
+# Copy the built files and the server code
+COPY --from=build-stage /app/dist ./dist
+COPY --from=build-stage /app/server ./server
+COPY --from=build-stage /app/shared ./shared
+
+# Ensure your Express app listens on port 5003
+ENV PORT=5003
+EXPOSE 5003
+
+# Command to start your Express server
+CMD ["node", "server/index.js"]

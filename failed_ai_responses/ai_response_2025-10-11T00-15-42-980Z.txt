@@ -1,0 +1,43 @@
+{"expenses":[
+   {
+     "description":"YGO C	08/12/25 MOBILE PURCHASE 	0809 PATH	 TA	PP PA	 NE	W	JERSEY 	NJ ",
+     "amount":-3.00,
+     "category":50,
+     "subcategory":"Transportation"
+   },
+   {
+     "description":"S FAC	08/12/25 MOBILE PURCHASE 	0810 0597	0 F	ITNES	 JE	R	SEY CITY	 NJ ",
+     "amount":-5.35,
+     "category":"Needs",
+     "subcategory":"Utilities"
+   },
+   {
+     "description":"LI AN	08/12/25 MOBILE PURCHASE 	0811 MY C	ORN	ER DE	 JE	R	SEY CITY	 NJ ",
+     "amount":-9.88,
+     "category":"Needs",
+     "subcategory":"Insurance"
+   },
+   {
+     "description":"AFE N	08/13/25 MOBILE PURCHASE 	0812 TST*	CAN	ARD C	 Je	n",
+     "amount":-4.36,
+     "category":"Entertainment",
+     "subcategory":"Subscriptions"
+   },
+   {
+     "description":"7 JER	08/13/25 MOBILE PURCHASE 	0813 CHIP	OTL	E 262	SEY	 NJ ",
+     "amount":-13.27,
+     "category":"Entertainment",
+     "subcategory":"Chipotle Mexican Grill"
+   },
+   {
+     "description":"CONF#	08/14/25 Zelle payment to	ROBERT P	 SE	NIUK 	i2	qb90et ",
+     "amount":-50.00,
+     "category":"Transfer"
+   },
+   {
+     "description":"77	08/14/25 KEEP THE CHANGE 	TRANSFER 	TO 	ACCT 	 FOR	 08/14/25",
+     "amount":-4.35,
+     "category":"Transfer"
+   }
+ ],"recommendations":"Consider reducing mobile purchases by finding cheaper alternatives (e.g., public transport) and canceling unused services."
+}

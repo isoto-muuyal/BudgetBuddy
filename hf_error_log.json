@@ -1,0 +1,39 @@
+{
+  "name": "ProviderApiError",
+  "httpRequest": {
+    "url": "https://router.huggingface.co/featherless-ai/v1/chat/completions",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer [redacted]",
+      "Content-Type": "application/json",
+      "User-Agent": "@huggingface/inference/4.8.0"
+    },
+    "body": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. Always reply ONLY with valid JSON. Do NOT invent, guess, or assume financial figures not explicitly mentioned in the user's input, and do NOT return more expenses than received. If uncertain about any categorization, use 'undefined'. Do NOT duplicate records."
+        },
+        {
+          "role": "user",
+          "content": "\nYou are a financial advisor analyzing bank statement data. Please categorize each expense according to the 50/30/20 budgeting rule:\n\n- 50% for NEEDS: Essential expenses like rent, groceries, utilities, minimum debt payments, insurance, transportation to work\n- 30% for WANTS: Non-essential expenses like entertainment, dining out, hobbies, subscriptions, shopping\n- 20% for SAVINGS: Money saved, invested, or put toward debt payments above minimums\n\nMonthly Income: $28000\nBreakdown:\n- Needs: $14000.00\n- Wants: $8400.00\n- Savings: $5600.00\n\nBank Statement Content:\nYGO C\t08/12/25 MOBILE PURCHASE \t0809 PATH\t TA\tPP PA\t NE\tW\t JERSEY \tNJ -3.00\t\nYGO C\t08/12/25 MOBILE PURCHASE \t0809 PATH\t TA\tPP PA\t NE\tW\t JERSEY \tNJ -3.00\t\nS FAC\t08/12/25 MOBILE PURCHASE \t0810 0597\t0 F\tITNES\t JE\tR\tSEY CITY\t NJ -2.00\t\nS FAC\t08/12/25 MOBILE PURCHASE \t0810 0597\t0 F\tITNES\t JE\tR\tSEY CITY\t NJ -5.35\t\nLI AN\t08/12/25 MOBILE PURCHASE \t0811 MY C\tORN\tER DE\t JE\tR\tSEY CITY\t NJ -9.88\t\nAFE N\t08/12/25 MOBILE PURCHASE \t0811 TST*\tCAN\tARD C\t Je\tr\tsey City\t NJ -7.59\t\nYGO C\t08/12/25 MOBILE PURCHASE \t0811 PATH\t TA\tPP PA\t NE\tW\t JERSEY \tNJ -3.00\t\nGO NE\t08/12/25 MOBILE PURCHASE \t0811 MTA*\tNYC\tT PAY\tW Y\tO\tRK NY -2\t0.90\t\nYGO C\t08/12/25 MOBILE PURCHASE \t0811 PATH\t TA\tPP PA\t NE\tW\t JERSEY \tNJ -3.00\t\nit Je\t08/12/25 MOBILE PURCHASE \t0812 GDP*\tJer\tsey C\trse\ty\t City NJ\t-25.00\t\nXXXXX\t08/12/25 FPB CR CARD DES:\tINTERNET \tID:\t WEBX\tXXX\t \tINDN:ISR\tAEL SOTO CO\t\n77\t08/12/25 KEEP THE CHANGE \tTRANSFER \tTO \tACCT \tFOR\t \t08/12/25\t-1.28\t\n65 NE\t08/13/25 MOBILE PURCHASE \t0811 ROMA\t PI\tZZA 4\tW Y\tO\tRK NY -9\t0.98\t\nAFE N\t08/13/25 MOBILE PURCHASE \t0812 TST*\tCAN\tARD C\t Je\tr\tsey City\t NJ -4.36\t\n7 JER\t08/13/25 MOBILE PURCHASE \t0812 CHIP\tOTL\tE 262\tSEY\t \tCITY NJ \t-13.86\t\n77\t08/13/25 KEEP THE CHANGE \tTRANSFER \tTO \tACCT \tFOR\t \t08/13/25\t-1.30\t\n88221\t08/14/25 PURCHASE 0813 PA\tYPAL *MIN\tT M\tOBI 8\t116\t1\t CA -97.\t39\t\nS FAC\t08/14/25 MOBILE PURCHASE \t0812 0597\t0 F\tITNES\t JE\tR\tSEY CITY\t NJ -5.35\t\n88221\t08/14/25 PURCHASE 0813 PP\t*APPLE.CO\tM/B\tILL 8\t116\t1\t CA -12.\t98\t\nACAFE\t08/14/25 MOBILE PURCHASE \t0813 BACC\tHRI\tSTIAN\t NE\tW\tARK DE -\t10.46\t\nACAFE\t08/14/25 MOBILE PURCHASE \t0813 BACC\tHRI\tSTIAN\t NE\tW\tARK DE -\t6.15\t\n7 JER\t08/14/25 MOBILE PURCHASE \t0813 CHIP\tOTL\tE 262\tSEY\t \tCITY NJ \t-13.27\t\n CENT\t08/14/25 MOBILE PURCHASE \t0813 2660\t NE\tWPORT\t JE\tR\tSEY CITY\t NJ -5.00\t\nConf#\t08/14/25 Zelle payment to\t ROBERT P\t SE\tNIUK \t i2\to\tqb90et -\t50.00\t\n77\t08/14/25 KEEP THE CHANGE \tTRANSFER \tTO \tACCT \tFOR\t \t08/14/25\t-4.35\t\n\n\nPlease analyze the transactions and provide your response in the following JSON format:\n\nThe response must be a json object following the next format:\n{\n    expenses: [array of expenses]\n    recommendations: \"detailed recommendations\"\n}\n\none expense object looks like this:\n{\n      \"description\": \"[transaction description]\",\n      \"amount\": [amount as number, negative for expenses, positive for income/savings],\n      \"category\": \"[50%, 30%, 20%, or undefined]\",\n      \"subcategory\": \"[specific category like Housing, Food, Entertainment, etc.]\"\n    }\n\nexpenses looks like this\n\"expenses\": [\n    {\n      \"description\": \"[transaction description]\",\n      \"amount\": [amount as number, negative for expenses, positive for income/savings],\n      \"category\": \"[50%, 30%, 20%, or undefined]\",\n      \"subcategory\": \"[specific category like Housing, Food, Entertainment, etc.]\"\n    }\n  ],\n\nand recommendations like this\n  \"recommendations\": \"[Detailed recommendations for improving their budget based on the 50/30/20 rule. Provide specific actionable advice.]\"\n\nThe response object should look like this example\n\n{\n  \"expenses\": [\n    {\n      \"description\": \"[transaction description]\",\n      \"amount\": [amount as number, negative for expenses, positive for income/savings],\n      \"category\": \"[50%, 30%, 20%, or undefined] this are the only categories allowed\",\n      \"subcategory\": \"[specific category like Housing, Food, Entertainment, etc.]\"\n    }\n  ],\n  \"recommendations\": \"[Detailed recommendations for improving their budget based on the 50/30/20 rule. Provide specific actionable advice.]\"\n}\n\nImportant:\n- Be conservative with categorization - when unsure, use \"undefined\"\n- Negative amounts are expenses, positive amounts are income or transfers to savings\n- Focus on providing actionable, specific recommendations\n- Consider their actual spending vs recommended percentages\n- when subcategory is Wants then category must be 30%\n- If subcategory is Housing then category must be 50%\n"
+        }
+      ],
+      "temperature": 0.2,
+      "max_tokens": 1024,
+      "model": "HuggingFaceH4/zephyr-7b-beta"
+    }
+  },
+  "httpResponse": {
+    "requestId": "Root=1-68e9b54e-4ebcb0db22fae2f37a2dda8c",
+    "status": 400,
+    "body": {
+      "error": {
+        "message": "The model is not ready for inference. Please wait for the model to warm, then try again.",
+        "type": "invalid_request_error",
+        "param": null,
+        "code": "model_pending_deploy"
+      }
+    }
+  }
+}
