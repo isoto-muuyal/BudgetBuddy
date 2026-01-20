@@ -23,4 +23,4 @@ ENV PORT=5003
 EXPOSE 5003
 
 # Command to start your Express server
-CMD ["node", "server/index.js"]
+CMD ["node", "dist/index.js"]
