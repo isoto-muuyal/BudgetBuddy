@@ -64,6 +64,7 @@ jobs:
             echo  ${COMPOSE_PATH}
             echo  ${EC2_USER}
             echo  ${EC2_HOST}
+            echo ${COMPOSE_PATH} 
 
             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
@@ -72,7 +73,7 @@ jobs:
 
             echo "Starting containers with Docker Compose..."
             docker rm -f budgetbuddy_app || true
-            docker compose -f ${COMPOSE_PATH} up -d
+            docker compose -f ${COMPOSE_PATH} up -d --remove-orphans
 
             echo "Running database migrations..."
             docker exec budgetbuddy_app npm run db:push
