@@ -52,7 +52,8 @@ jobs:
           IMAGE_TAG: latest
           COMPOSE_PATH: /home/${{ secrets.EC2_USER }}/app/ai-chat-platform/budgetbuddy-docker-compose.yml
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} \
+          "AWS_REGION=${AWS_REGION} ECR_REGISTRY=${ECR_REGISTRY} ECR_REPOSITORY=${ECR_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} COMPOSE_PATH=${COMPOSE_PATH} bash -s" << 'ENDSSH'
             set -e
 
             echo "Logging in to ECR..."
