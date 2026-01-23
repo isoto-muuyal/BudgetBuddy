@@ -56,6 +56,14 @@ jobs:
             set -e
 
             echo "Logging in to ECR..."
+            echo  "${AWS_REGION}"
+            echo  "${ECR_REGISTRY}"
+            echo  "${ECR_REPOSITORY}"
+            echo  "${IMAGE_TAG}"
+            echo  "${COMPOSE_PATH}"
+            echo  "${EC2_USER}"
+            echo  "${EC2_HOST}"
+            
             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
             echo "Pulling latest image..."
