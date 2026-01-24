@@ -50,7 +50,7 @@ jobs:
           ECR_REGISTRY: 457335975306.dkr.ecr.us-east-2.amazonaws.com
           ECR_REPOSITORY: budgetbuddy_app
           IMAGE_TAG: latest
-          COMPOSE_PATH: /home/${{ secrets.EC2_USER }}/apps/ai-chat-platform/budgetbuddy-docker-compose.yml
+          COMPOSE_PATH: /home/${{ secrets.EC2_USER }}/apps/budgetbuddy/budgetbuddy-docker-compose.yml
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} \
           "AWS_REGION=${AWS_REGION} ECR_REGISTRY=${ECR_REGISTRY} ECR_REPOSITORY=${ECR_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} COMPOSE_PATH=${COMPOSE_PATH} bash -s" << 'ENDSSH'
@@ -72,11 +72,10 @@ jobs:
             docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
 
             echo "Starting containers with Docker Compose..."
-            docker rm -f budgetbuddy_app || true
-            docker compose -f ${COMPOSE_PATH} up -d --remove-orphans
+            docker compose -p budgetbuddy -f ${COMPOSE_PATH} up -d
 
             echo "Running database migrations..."
-            docker exec budgetbuddy_app npm run db:push
+            docker compose -p budgetbuddy -f ${COMPOSE_PATH} run --rm budgetbuddy npm run db:push
             
             echo "Deployment completed successfully!"
           ENDSSH
