@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { users, budgetAnalyses, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis } from "@shared/schema";
+import { users, budgetAnalyses, debts, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export interface IStorage {
@@ -22,6 +22,11 @@ export interface IStorage {
   getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
   createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<BudgetAnalysis>;
   updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis>;
+
+  // Debt methods
+  getDebtsByUser(userId: string): Promise<Debt[]>;
+  createDebt(userId: string, debt: InsertDebt): Promise<Debt>;
+  deleteDebt(userId: string, debtId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -155,6 +160,28 @@ export class DatabaseStorage implements IStorage {
       expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
       recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
     };
+  }
+
+  async getDebtsByUser(userId: string): Promise<Debt[]> {
+    return await db.select().from(debts).where(eq(debts.userId, userId));
+  }
+
+  async createDebt(userId: string, debtInput: InsertDebt): Promise<Debt> {
+    const [debt] = await db
+      .insert(debts)
+      .values({ ...debtInput, userId })
+      .returning();
+
+    if (!debt) {
+      throw new Error("Failed to create debt");
+    }
+    return debt;
+  }
+
+  async deleteDebt(userId: string, debtId: string): Promise<void> {
+    await db
+      .delete(debts)
+      .where(and(eq(debts.id, debtId), eq(debts.userId, userId)));
   }
 }
 

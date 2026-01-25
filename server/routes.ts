@@ -8,7 +8,7 @@ import { authService } from "./services/auth";
 import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema } from "@shared/schema";
 import { config } from "./config";
 
 // Configure multer for file uploads
@@ -188,6 +188,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
       res.json(analyses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/analysis/patterns", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
+      const completed = analyses.filter((analysis) =>
+        analysis.analysisStatus === "completed" &&
+        analysis.actualNeeds &&
+        analysis.actualWants &&
+        analysis.actualSavings &&
+        analysis.recommendations
+      );
+
+      if (!completed.length) {
+        return res.json({ patterns: "Not enough completed analyses to detect meaningful patterns yet." });
+      }
+
+      const rows = completed.map((analysis) => {
+        const monthlyIncome = parseFloat(analysis.monthlyIncome || "0");
+        const actualNeeds = parseFloat(analysis.actualNeeds || "0");
+        const actualWants = parseFloat(analysis.actualWants || "0");
+        const actualSavings = parseFloat(analysis.actualSavings || "0");
+        const divisor = monthlyIncome || 1;
+
+        return {
+          uploadDate: analysis.uploadDate ? new Date(analysis.uploadDate).toISOString() : "",
+          monthlyIncome,
+          actualNeeds,
+          actualWants,
+          actualSavings,
+          needsPercent: (actualNeeds / divisor) * 100,
+          wantsPercent: (actualWants / divisor) * 100,
+          savingsPercent: (actualSavings / divisor) * 100,
+          recommendations: analysis.recommendations || "",
+        };
+      });
+
+      const patterns = await aiService.analyzeHistoryPatterns(rows);
+      res.json({ patterns });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/debts", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const debts = await storage.getDebtsByUser(req.user.id);
+      res.json(debts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/debts", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const debtData = debtInputSchema.parse(req.body);
+      const debt = await storage.createDebt(req.user.id, {
+        name: debtData.name,
+        totalAmount: debtData.totalAmount,
+        monthlyPayment: debtData.monthlyPayment,
+      });
+      res.json(debt);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/debts/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteDebt(req.user.id, req.params.id);
+      res.json({ message: "Debt deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

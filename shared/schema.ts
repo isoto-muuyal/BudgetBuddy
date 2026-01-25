@@ -35,6 +35,15 @@ export const budgetAnalyses = pgTable("budget_analyses", {
   analysisStatus: text("analysis_status").default("pending"), // pending, completed, failed
 });
 
+export const debts = pgTable("debts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  monthlyPayment: decimal("monthly_payment", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   emailVerified: true,
@@ -63,6 +72,18 @@ export const insertBudgetAnalysisSchema = createInsertSchema(budgetAnalyses).omi
   analysisStatus: true,
 });
 
+export const insertDebtSchema = createInsertSchema(debts).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const debtInputSchema = z.object({
+  name: z.string().min(1, "Debt name is required"),
+  totalAmount: z.string().min(1, "Total amount is required"),
+  monthlyPayment: z.string().min(1, "Monthly payment is required"),
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
 });
@@ -79,5 +100,7 @@ export type SignupUser = z.infer<typeof signupSchema>;
 export type IncomeInput = z.infer<typeof incomeSchema>;
 export type BudgetAnalysis = typeof budgetAnalyses.$inferSelect;
 export type InsertBudgetAnalysis = z.infer<typeof insertBudgetAnalysisSchema>;
+export type Debt = typeof debts.$inferSelect;
+export type InsertDebt = z.infer<typeof insertDebtSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

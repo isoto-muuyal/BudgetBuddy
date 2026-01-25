@@ -16,6 +16,18 @@ export interface AIExpenseAnalysis {
   recommendations: string;
 }
 
+export interface AIHistoryPatternRow {
+  uploadDate: string;
+  monthlyIncome: number;
+  actualNeeds: number;
+  actualWants: number;
+  actualSavings: number;
+  needsPercent: number;
+  wantsPercent: number;
+  savingsPercent: number;
+  recommendations: string;
+}
+
 interface CategorizedExpense {
     description: string;
     amount: number;
@@ -211,6 +223,47 @@ export class AIService {
   }
 
   /**
+   * Analyze historical completed analyses for patterns and trends
+   */
+  async analyzeHistoryPatterns(rows: AIHistoryPatternRow[]): Promise<string> {
+    if (!rows.length) {
+      return "Not enough completed analyses to detect meaningful patterns yet.";
+    }
+
+    const prompt = this.buildHistoryPatternsPrompt(rows);
+
+    try {
+      console.log("Calling recommendations AI API for history patterns...");
+      const result = await this.recommendationsClient.chatCompletion({
+        model: config.ai.recommendations.model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a financial analyst. Identify patterns and trends across multiple monthly analyses. " +
+              "Focus on consistent overspending or underspending categories, and summarize clear behavioral patterns."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 1024,
+        temperature: 0.4,
+      });
+
+      const patterns = result.choices[0]?.message?.content ?? "";
+      return this.parseRecommendationsResponse(patterns);
+    } catch (error: any) {
+      console.error("History patterns AI failed:", error);
+      if (error.httpResponse) {
+        console.error("HTTP error status:", error.httpResponse.status);
+        console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      }
+      return "Unable to generate historical patterns at this time. Please try again later.";
+    }
+  }
+
+  /**
    * Build prompt for categorization AI
    */
   private buildCategorizationPrompt(textContent: string, monthlyIncome: number): string {
@@ -289,8 +342,29 @@ Provide detailed, actionable recommendations for improving their budget. Focus o
 2. Practical steps they can take to align with the 50/30/20 rule
 3. Suggestions for reducing expenses in categories that exceed recommendations
 4. Ways to increase savings if below 20%
+5. Identify specific "Wants" expenses that can be cut and redirected toward debt payments, with estimated amounts
 
 Format your response as clear, actionable advice with bullet points. Be specific and encouraging.
+`;
+  }
+
+  /**
+   * Build prompt for historical pattern analysis
+   */
+  private buildHistoryPatternsPrompt(rows: AIHistoryPatternRow[]): string {
+    return `
+Analyze the user's historical budget analyses and identify patterns or trends.
+Each row includes actual spending percentages and the recommendations provided.
+
+Historical rows:
+${JSON.stringify(rows, null, 2)}
+
+Provide:
+- Recurring overspending/underspending patterns
+- Notable changes over time
+- A short summary of the most common recommendation themes
+
+Keep the response concise and actionable with bullet points.
 `;
   }
 
@@ -486,7 +560,9 @@ Format your response as clear, actionable advice with bullet points. Be specific
     }
 
     if (totals.wants > recommendedWants) {
+      const extraFromWants = (totals.wants - recommendedWants).toFixed(2);
       recommendations += `• Your discretionary spending (${wantsPercentage}%) exceeds the recommended 30%. Try to cut back on non-essential purchases like entertainment and dining out.\n`;
+      recommendations += `• Consider redirecting about $${extraFromWants} from Wants toward extra debt payments.\n`;
     }
 
     if (totals.savings < recommendedSavings) {
