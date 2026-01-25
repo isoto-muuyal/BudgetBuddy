@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+uploads
+attached_assets
+training_data
+test
+tmpFile
+log.txt
+npm-debug.log
+*.md
