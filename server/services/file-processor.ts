@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import pdf from "pdf-parse";
+import pdf from "pdf-parse/lib/pdf-parse.js";
 import xlsx from "xlsx";
 import csv from "csv-parser";
 import { createReadStream } from "fs";
