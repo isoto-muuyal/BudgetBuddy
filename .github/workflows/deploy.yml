@@ -52,11 +52,12 @@ jobs:
           IMAGE_TAG: latest
           COMPOSE_PATH: /home/${{ secrets.EC2_USER }}/apps/budgetbuddy/docker-compose.yml
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} \
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=6 ${EC2_USER}@${EC2_HOST} \
           "AWS_REGION=${AWS_REGION} ECR_REGISTRY=${ECR_REGISTRY} ECR_REPOSITORY=${ECR_REPOSITORY} IMAGE_TAG=${IMAGE_TAG} COMPOSE_PATH=${COMPOSE_PATH} bash -s" << 'ENDSSH'
             set -e
 
             echo "Logging in to ECR..."
+            echo "Started at: $(date)"
             echo  ${AWS_REGION}
             echo  ${ECR_REGISTRY}
             echo  ${ECR_REPOSITORY}
@@ -70,6 +71,7 @@ jobs:
 
             echo "Pulling latest image..."
             docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+            echo "Pull completed at: $(date)"
 
             echo "Starting containers with Docker Compose..."
             docker compose -p budgetbuddy -f ${COMPOSE_PATH} up -d
