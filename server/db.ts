@@ -115,7 +115,7 @@ export async function ensureSeedUser(): Promise<void> {
   }
 
   const email = process.env.SEED_USER_EMAIL || "israel.soto@muuyal.tech";
-  const passwordHash = process.env.SEED_USER_PASSWORD_HASH || "REPLACE_ME";
+  const passwordHash = process.env.SEED_USER_PASSWORD_HASH || "$2b$12$XXhNF4jnMH2jicp8UNPKO.Zyrw735cfPozZVKruUpOV4EvghO29Gy";
   const fullName = process.env.SEED_USER_FULL_NAME || "Israel Soto";
 
   if (!email || passwordHash === "REPLACE_ME") {

@@ -30,6 +30,28 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private serializeExpenses(value: unknown): string | null {
+    if (value === undefined || value === null) return null;
+    if (typeof value === "string") return value;
+    return JSON.stringify(value);
+  }
+
+  private encryptExpenses(value: unknown): string | null {
+    const serialized = this.serializeExpenses(value);
+    if (!serialized) return null;
+    return encrypt(serialized);
+  }
+
+  private decryptExpenses(value: string | null): unknown {
+    if (!value) return value;
+    const decrypted = decrypt(value);
+    try {
+      return JSON.parse(decrypted);
+    } catch {
+      return decrypted;
+    }
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
@@ -99,7 +121,7 @@ export class DatabaseStorage implements IStorage {
     // Decrypt expenses and recommendations
     return {
       ...analysis,
-      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      expenses: this.decryptExpenses(analysis.expenses),
       recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
     };
   }
@@ -110,7 +132,7 @@ export class DatabaseStorage implements IStorage {
     // Decrypt expenses and recommendations for each analysis
     return analyses.map(analysis => ({
       ...analysis,
-      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      expenses: this.decryptExpenses(analysis.expenses),
       recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
     }));
   }
@@ -119,7 +141,7 @@ export class DatabaseStorage implements IStorage {
     // Encrypt expenses and recommendations before storing
     const encryptedAnalysis = {
       ...insertAnalysis,
-      expenses: insertAnalysis.expenses ? JSON.parse(encrypt(JSON.stringify(insertAnalysis.expenses))) : insertAnalysis.expenses,
+      expenses: this.encryptExpenses(insertAnalysis.expenses),
       recommendations: insertAnalysis.recommendations ? encrypt(insertAnalysis.recommendations) : insertAnalysis.recommendations,
     };
     
@@ -131,7 +153,7 @@ export class DatabaseStorage implements IStorage {
     // Return decrypted version
     return {
       ...analysis,
-      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      expenses: this.decryptExpenses(analysis.expenses),
       recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
     };
   }
@@ -140,7 +162,7 @@ export class DatabaseStorage implements IStorage {
     // Encrypt expenses and recommendations if they're being updated
     const encryptedUpdates = {
       ...updates,
-      expenses: updates.expenses ? JSON.parse(encrypt(JSON.stringify(updates.expenses))) : updates.expenses,
+      expenses: this.encryptExpenses(updates.expenses),
       recommendations: updates.recommendations ? encrypt(updates.recommendations) : updates.recommendations,
     };
     
@@ -157,7 +179,7 @@ export class DatabaseStorage implements IStorage {
     // Return decrypted version
     return {
       ...analysis,
-      expenses: analysis.expenses ? JSON.parse(decrypt(JSON.stringify(analysis.expenses))) : analysis.expenses,
+      expenses: this.decryptExpenses(analysis.expenses),
       recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
     };
   }
