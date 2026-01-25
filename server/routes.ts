@@ -294,46 +294,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
-}
-
-// Async file processing function
-async function processFileAsync(analysisId: string, filePath: string, monthlyIncome: number) {
-  try {
-
-    // Extract text from file
-    const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
-    
-    // Analyze with AI
-    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome);
-    console.log(`AI analysis result for ${analysisId}:`, aiResult);
-
-    // Update analysis with results
-    await storage.updateBudgetAnalysis(analysisId, {
-      actualNeeds: aiResult.needs.toString(),
-      actualWants: aiResult.wants.toString(),
-      actualSavings: aiResult.savings.toString(),
-      actualUndefined: aiResult.undefined.toString(),
-      expenses: JSON.stringify(aiResult.expenses),
-      recommendations: aiResult.recommendations,
-      analysisStatus: "completed",
-    });
-
-    console.log(`Analysis completed for ${analysisId}`);
-  } catch (error) {
-    console.error(`Analysis failed for ${analysisId}:`, error);
-    
-    // Update analysis with error status
-    await storage.updateBudgetAnalysis(analysisId, {
-      analysisStatus: "failed",
-      recommendations: "Analysis failed. Please try uploading your file again or contact support if the issue persists.",
-    });
-  } finally {
-    // Clean up the uploaded file
-    await fileProcessor.deleteFile(filePath);
-  }
-}
   app.get("/api/auth/google", async (_req, res) => {
     try {
       cleanupGoogleStates();
@@ -410,3 +370,44 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
       res.status(500).json({ message: error.message });
     }
   });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
+
+// Async file processing function
+async function processFileAsync(analysisId: string, filePath: string, monthlyIncome: number) {
+  try {
+
+    // Extract text from file
+    const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
+    
+    // Analyze with AI
+    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome);
+    console.log(`AI analysis result for ${analysisId}:`, aiResult);
+
+    // Update analysis with results
+    await storage.updateBudgetAnalysis(analysisId, {
+      actualNeeds: aiResult.needs.toString(),
+      actualWants: aiResult.wants.toString(),
+      actualSavings: aiResult.savings.toString(),
+      actualUndefined: aiResult.undefined.toString(),
+      expenses: JSON.stringify(aiResult.expenses),
+      recommendations: aiResult.recommendations,
+      analysisStatus: "completed",
+    });
+
+    console.log(`Analysis completed for ${analysisId}`);
+  } catch (error) {
+    console.error(`Analysis failed for ${analysisId}:`, error);
+    
+    // Update analysis with error status
+    await storage.updateBudgetAnalysis(analysisId, {
+      analysisStatus: "failed",
+      recommendations: "Analysis failed. Please try uploading your file again or contact support if the issue persists.",
+    });
+  } finally {
+    // Clean up the uploaded file
+    await fileProcessor.deleteFile(filePath);
+  }
+}
