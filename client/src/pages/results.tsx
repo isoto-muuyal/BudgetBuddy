@@ -144,6 +144,44 @@ export default function Results({ params }: ResultsProps) {
     }
   };
 
+  const handleDownloadRecommendations = () => {
+    if (!analysis?.recommendations) {
+      toast({
+        title: "Error",
+        description: "No recommendations available to download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const fileName = `BudgetBuddy-Recommendations-${analysis.id ?? "analysis"}-${dateStamp}.txt`;
+    const content = [
+      "BudgetBuddy Recommendations",
+      "",
+      `Date: ${new Date().toLocaleDateString()}`,
+      `Monthly Income: $${analysis.monthlyIncome ?? "N/A"}`,
+      "",
+      analysis.recommendations,
+      "",
+    ].join("\n");
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Success",
+      description: "Recommendations downloaded successfully!",
+    });
+  };
+
   return (
     <div className="max-w-md mx-auto p-4 pt-8">
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-results">
@@ -271,10 +309,21 @@ export default function Results({ params }: ResultsProps) {
           )}
           {!isProcessing && analysis.recommendations && (
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                <Bot className="text-brand-blue mr-2" />
-                AI Recommendations
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900 flex items-center">
+                  <Bot className="text-brand-blue mr-2" />
+                  AI Recommendations
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadRecommendations}
+                  data-testid="button-download-recommendations"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
               <div className="text-sm text-gray-700" data-testid="text-recommendations">
                 {analysis.recommendations}
               </div>
