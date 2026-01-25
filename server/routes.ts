@@ -10,7 +10,7 @@ import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema } from "@shared/schema";
 import { config } from "./config";
-import { Issuer, generators } from "openid-client";
+import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 
@@ -43,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!config.google.clientId || !config.google.clientSecret || !config.google.redirectUrl) {
       throw new Error("Google OAuth is not configured");
     }
-    const issuer = await Issuer.discover("https://accounts.google.com");
+    const issuer = await openidClient.Issuer.discover("https://accounts.google.com");
     return new issuer.Client({
       client_id: config.google.clientId,
       client_secret: config.google.clientSecret,
@@ -338,9 +338,9 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
     try {
       cleanupGoogleStates();
       const client = await getGoogleClient();
-      const codeVerifier = generators.codeVerifier();
-      const codeChallenge = generators.codeChallenge(codeVerifier);
-      const state = generators.state();
+      const codeVerifier = openidClient.generators.codeVerifier();
+      const codeChallenge = openidClient.generators.codeChallenge(codeVerifier);
+      const state = openidClient.generators.state();
 
       googleStateStore.set(state, { codeVerifier, createdAt: Date.now() });
 

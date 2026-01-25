@@ -54,3 +54,36 @@ export async function ensureDatabaseSchema(): Promise<void> {
     throw error;
   }
 }
+
+export async function ensureSeedUser(): Promise<void> {
+  const shouldSeed = process.env.AUTO_SEED_USER !== "false";
+  if (!shouldSeed) {
+    return;
+  }
+
+  const email = process.env.SEED_USER_EMAIL || "israel.soto@muuyal.tech";
+  const passwordHash = process.env.SEED_USER_PASSWORD_HASH || "REPLACE_ME";
+  const fullName = process.env.SEED_USER_FULL_NAME || "Israel Soto";
+
+  if (!email || passwordHash === "REPLACE_ME") {
+    console.warn("Seed user is not configured; skipping seed user creation.");
+    return;
+  }
+
+  try {
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
+    if (existing.rowCount && existing.rows[0]) {
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO users (id, email, full_name, password, email_verified, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, true, now())`,
+      [email, fullName, passwordHash]
+    );
+    console.log(`Seed user created for ${email}`);
+  } catch (error) {
+    console.error("Failed to seed user:", error);
+    throw error;
+  }
+}
