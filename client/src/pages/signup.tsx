@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { UserPlus, Eye, EyeOff } from "lucide-react";
+import { Chrome, UserPlus, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -155,6 +155,24 @@ export default function Signup() {
               </Button>
             </form>
           </Form>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              window.location.href = "/api/auth/google";
+            }}
+            data-testid="button-google-signup"
+          >
+            <Chrome className="mr-2 h-4 w-4" />
+            Continue with Google
+          </Button>
 
           <div className="text-center mt-6">
             <span className="text-gray-600">Already have an account? </span>

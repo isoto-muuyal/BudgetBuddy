@@ -7,6 +7,25 @@ import { emailService } from "./email";
 import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
 export class AuthService {
+  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean }) {
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      config.jwt.secret,
+      { expiresIn: "7d" }
+    );
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        monthlyIncome: user.monthlyIncome,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
   async signup(userData: SignupUser) {
     // Check if user already exists
     const existingUser = await storage.getUserByEmail(userData.email);
@@ -53,23 +72,7 @@ export class AuthService {
       throw new Error("Invalid email or password");
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      config.jwt.secret,
-      { expiresIn: "7d" }
-    );
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        monthlyIncome: user.monthlyIncome,
-        emailVerified: user.emailVerified,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   async verifyEmail(token: string) {

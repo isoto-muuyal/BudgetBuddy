@@ -27,6 +27,12 @@ export const config = {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    redirectUrl: process.env.GOOGLE_REDIRECT_URL || "",
+    frontendRedirect: process.env.GOOGLE_FRONTEND_REDIRECT || "",
+  },
   mongodb: {
     uri: process.env.MONGODB_URI || "mongodb://localhost:27017/budgetwise",
   },

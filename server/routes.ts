@@ -10,6 +10,9 @@ import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema } from "@shared/schema";
 import { config } from "./config";
+import { Issuer, generators } from "openid-client";
+import bcrypt from "bcrypt";
+import { randomBytes } from "crypto";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -34,6 +37,30 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const googleStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
+
+  async function getGoogleClient() {
+    if (!config.google.clientId || !config.google.clientSecret || !config.google.redirectUrl) {
+      throw new Error("Google OAuth is not configured");
+    }
+    const issuer = await Issuer.discover("https://accounts.google.com");
+    return new issuer.Client({
+      client_id: config.google.clientId,
+      client_secret: config.google.clientSecret,
+      redirect_uris: [config.google.redirectUrl],
+      response_types: ["code"],
+    });
+  }
+
+  function cleanupGoogleStates() {
+    const now = Date.now();
+    for (const [key, value] of googleStateStore.entries()) {
+      if (now - value.createdAt > 10 * 60 * 1000) {
+        googleStateStore.delete(key);
+      }
+    }
+  }
+
   // Auth routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
@@ -307,3 +334,79 @@ async function processFileAsync(analysisId: string, filePath: string, monthlyInc
     await fileProcessor.deleteFile(filePath);
   }
 }
+  app.get("/api/auth/google", async (_req, res) => {
+    try {
+      cleanupGoogleStates();
+      const client = await getGoogleClient();
+      const codeVerifier = generators.codeVerifier();
+      const codeChallenge = generators.codeChallenge(codeVerifier);
+      const state = generators.state();
+
+      googleStateStore.set(state, { codeVerifier, createdAt: Date.now() });
+
+      const authUrl = client.authorizationUrl({
+        scope: "openid email profile",
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+      });
+
+      res.redirect(authUrl);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const state = typeof req.query.state === "string" ? req.query.state : "";
+      const code = typeof req.query.code === "string" ? req.query.code : "";
+      if (!state || !code) {
+        return res.status(400).json({ message: "Missing OAuth parameters" });
+      }
+
+      const stateEntry = googleStateStore.get(state);
+      if (!stateEntry) {
+        return res.status(400).json({ message: "Invalid OAuth state" });
+      }
+      googleStateStore.delete(state);
+
+      const client = await getGoogleClient();
+      const tokenSet = await client.callback(
+        config.google.redirectUrl,
+        { code, state },
+        { code_verifier: stateEntry.codeVerifier }
+      );
+
+      const userInfo = await client.userinfo(tokenSet.access_token as string);
+      const email = typeof userInfo.email === "string" ? userInfo.email : "";
+      if (!email) {
+        return res.status(400).json({ message: "Google account email not available" });
+      }
+
+      const fullName = typeof userInfo.name === "string" && userInfo.name ? userInfo.name : email.split("@")[0];
+      let user = await storage.getUserByEmail(email);
+
+      if (!user) {
+        const password = randomBytes(32).toString("hex");
+        const hashedPassword = await bcrypt.hash(password, 12);
+        user = await storage.createUser({
+          email,
+          fullName,
+          password: hashedPassword,
+          emailVerified: true,
+        });
+      }
+
+      const authResponse = authService.buildAuthResponse(user);
+      if (config.google.frontendRedirect) {
+        const redirectUrl = new URL(config.google.frontendRedirect);
+        redirectUrl.searchParams.set("token", authResponse.token);
+        return res.redirect(redirectUrl.toString());
+      }
+
+      res.json(authResponse);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });

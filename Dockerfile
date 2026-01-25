@@ -18,10 +18,10 @@ COPY --from=build-stage /app/dist ./dist
 COPY --from=build-stage /app/server ./server
 COPY --from=build-stage /app/shared ./shared
 COPY --from=build-stage /app/drizzle.config.ts ./drizzle.config.ts
-
 # Ensure your Express app listens on port 5003
 ENV NODE_ENV=production
 ENV PORT=5003
+ENV AUTO_DB_PUSH=true
 EXPOSE 5003
 
 # Command to start your Express server

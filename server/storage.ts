@@ -11,7 +11,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   getUserByPasswordResetToken(token: string): Promise<User | undefined>;
-  createUser(user: InsertUser & { verificationToken?: string }): Promise<User>;
+  createUser(user: InsertUser & { verificationToken?: string; emailVerified?: boolean }): Promise<User>;
   updateUserIncome(userId: string, monthlyIncome: string): Promise<User>;
   verifyUserEmail(userId: string): Promise<void>;
   setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
@@ -45,7 +45,7 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser & { verificationToken?: string }): Promise<User> {
+  async createUser(insertUser: InsertUser & { verificationToken?: string; emailVerified?: boolean }): Promise<User> {
     const [user] = await db
       .insert(users)
       .values(insertUser)
