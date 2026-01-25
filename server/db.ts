@@ -48,7 +48,60 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await execFileAsync("node", ["./node_modules/.bin/drizzle-kit", "push", "--config", "drizzle.config.ts"], {
       env: process.env,
     });
-    console.log("Database schema created successfully.");
+    const verify = await pool.query("SELECT to_regclass('public.users') AS users");
+    const verified = verify.rows?.[0]?.users;
+    if (verified) {
+      console.log("Database schema created successfully.");
+      return;
+    }
+
+    console.warn("Drizzle schema push did not create tables. Falling back to SQL schema creation...");
+    await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        email text NOT NULL UNIQUE,
+        full_name text NOT NULL,
+        password text NOT NULL,
+        monthly_income numeric(10,2),
+        email_verified boolean DEFAULT false,
+        verification_token text,
+        created_at timestamp DEFAULT now(),
+        password_reset_token text,
+        password_reset_expiry timestamp
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS budget_analyses (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id),
+        file_name text NOT NULL,
+        original_file_name text NOT NULL,
+        upload_date timestamp DEFAULT now(),
+        monthly_income numeric(10,2) NOT NULL,
+        recommended_needs numeric(10,2) NOT NULL,
+        recommended_wants numeric(10,2) NOT NULL,
+        recommended_savings numeric(10,2) NOT NULL,
+        actual_needs numeric(10,2),
+        actual_wants numeric(10,2),
+        actual_savings numeric(10,2),
+        actual_undefined numeric(10,2),
+        expenses text,
+        recommendations text,
+        analysis_status text DEFAULT 'pending'
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS debts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id),
+        name text NOT NULL,
+        total_amount numeric(10,2) NOT NULL,
+        monthly_payment numeric(10,2) NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);
     throw error;
