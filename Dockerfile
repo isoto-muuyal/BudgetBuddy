@@ -12,7 +12,8 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=build-stage /app/package*.json ./
 # Install production dependencies only
-RUN npm install --omit=dev
+#RUN npm install --omit=dev
+RUN npm install
 # Copy the built files and the server code
 COPY --from=build-stage /app/dist ./dist
 COPY --from=build-stage /app/server ./server
