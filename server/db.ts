@@ -71,6 +71,13 @@ export async function ensureSeedUser(): Promise<void> {
   }
 
   try {
+    const tableCheck = await pool.query("SELECT to_regclass('public.users') AS users");
+    const hasUsersTable = tableCheck.rows?.[0]?.users;
+    if (!hasUsersTable) {
+      console.warn("Seed user skipped because users table is missing.");
+      return;
+    }
+
     const existing = await pool.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
     if (existing.rowCount && existing.rows[0]) {
       return;
