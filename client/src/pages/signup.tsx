@@ -11,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { signupSchema, type SignupUser } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 export default function Signup() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const form = useForm<SignupUser>({
     resolver: zodResolver(signupSchema),
@@ -33,14 +35,14 @@ export default function Signup() {
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Account created successfully! Please check your email for verification.",
+        title: t("signup.successTitle"),
+        description: t("signup.successDesc"),
       });
       setLocation("/login");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -60,10 +62,10 @@ export default function Signup() {
               <UserPlus className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-signup-title">
-              Create Account
+              {t("signup.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-signup-description">
-              Join BudgetWise to start managing your finances
+              {t("signup.description")}
             </p>
           </div>
 
@@ -74,12 +76,12 @@ export default function Signup() {
                 name="fullName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>{t("signup.fullName")}</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="Enter your full name"
+                        <Input
+                          {...field}
+                          type="text"
+                          placeholder={t("signup.fullName")}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
                         data-testid="input-fullname"
                       />
@@ -94,12 +96,12 @@ export default function Signup() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("signup.email")}</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="Enter your email"
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder={t("signup.email")}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
                         data-testid="input-email"
                       />
@@ -114,13 +116,13 @@ export default function Signup() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("signup.password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
                           {...field}
                           type={showPassword ? "text" : "password"}
-                          placeholder="Create a password"
+                          placeholder={t("signup.passwordPlaceholder")}
                           className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
                           data-testid="input-password"
                         />
@@ -142,7 +144,7 @@ export default function Signup() {
               />
 
               <div className="text-xs text-gray-500">
-                By creating an account, you agree to our Terms of Service and Privacy Policy.
+                {t("signup.termsNote")}
               </div>
 
               <Button
@@ -151,14 +153,14 @@ export default function Signup() {
                 disabled={signupMutation.isPending}
                 data-testid="button-submit"
               >
-                {signupMutation.isPending ? "Creating Account..." : "Create Account"}
+                {signupMutation.isPending ? t("signup.submitting") : t("signup.submit")}
               </Button>
             </form>
           </Form>
 
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">or</span>
+            <span className="text-xs text-gray-400">{t("common.or")}</span>
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
@@ -171,13 +173,13 @@ export default function Signup() {
             data-testid="button-google-signup"
           >
             <Chrome className="mr-2 h-4 w-4" />
-            Continue with Google
+            {t("signup.google")}
           </Button>
 
           <div className="text-center mt-6">
-            <span className="text-gray-600">Already have an account? </span>
+            <span className="text-gray-600">{t("signup.haveAccount")} </span>
             <Link href="/login" className="text-brand-purple hover:text-brand-dark font-medium" data-testid="link-login">
-              Sign in
+              {t("signup.login")}
             </Link>
           </div>
         </CardContent>

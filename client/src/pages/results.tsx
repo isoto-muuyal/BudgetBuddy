@@ -135,13 +135,13 @@ export default function Results({ params }: ResultsProps) {
   const getCategoryBadge = (category: string) => {
     switch (category) {
       case "50%":
-        return <Badge className="needs-bg needs-text">Needs</Badge>;
+        return <Badge className="needs-bg needs-text">{t("results.needs")}</Badge>;
       case "30%":
-        return <Badge className="wants-bg wants-text">Wants</Badge>;
+        return <Badge className="wants-bg wants-text">{t("results.wants")}</Badge>;
       case "20%":
-        return <Badge className="savings-bg savings-text">Savings</Badge>;
+        return <Badge className="savings-bg savings-text">{t("results.savings")}</Badge>;
       default:
-        return <Badge className="undefined-bg undefined-text">Unclear</Badge>;
+        return <Badge className="undefined-bg undefined-text">{t("results.unclear")}</Badge>;
     }
   };
 
@@ -223,12 +223,17 @@ export default function Results({ params }: ResultsProps) {
     }
 
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const fileName = `BudgetBuddy-Recommendations-${analysis.id ?? "analysis"}-${dateStamp}.txt`;
+    const incomeValue = analysis.monthlyIncome ? `$${analysis.monthlyIncome}` : t("common.notAvailable");
+    const fileName = t("results.recsFileName", {
+      appName: t("appName"),
+      id: analysis.id ?? "analysis",
+      date: dateStamp,
+    });
     const content = [
-      "BudgetBuddy Recommendations",
+      t("results.recsFileTitle", { appName: t("appName") }),
       "",
-      `Date: ${new Date().toLocaleDateString()}`,
-      `Monthly Income: $${analysis.monthlyIncome ?? "N/A"}`,
+      t("results.recsFileDate", { date: new Date().toLocaleDateString() }),
+      t("results.recsFileIncome", { income: incomeValue }),
       "",
       analysis.recommendations,
       "",
@@ -262,17 +267,15 @@ export default function Results({ params }: ResultsProps) {
   };
 
   const debtMetrics = useMemo(() => {
-
-    // Add a guard clause at the top of the memo
-  if (!analysis) {
-    return {
-      totalMonthlyDebtPayments: 0,
-      dti: 0,
-      dtiCategory: "N/A",
-      extraSource: "none",
-      extraAmount: 0,
-    };
-  }
+    if (!analysis) {
+      return {
+        totalMonthlyDebtPayments: 0,
+        dti: 0,
+        dtiCategory: t("results.dtiUnknown"),
+        extraSource: "none",
+        extraAmount: 0,
+      };
+    }
 
     const totalMonthlyDebtPayments = debts.reduce(
       (sum, debt) => sum + parseAmount(debt.monthlyPayment),
@@ -282,19 +285,19 @@ export default function Results({ params }: ResultsProps) {
 
     const dtiCategory =
       dti < 20
-        ? "Excellent"
+        ? t("results.dtiExcellent")
         : dti <= 35
-          ? "Good/Manageable"
+          ? t("results.dtiGood")
           : dti <= 40
-            ? "Fair/Caution"
+            ? t("results.dtiFair")
             : dti <= 49
-              ? "High Risk"
-              : "Danger Zone";
+              ? t("results.dtiHigh")
+              : t("results.dtiDanger");
 
-    const recommendedWants = parseAmount(analysis?.recommendedWants);
-    const recommendedSavings = parseAmount(analysis?.recommendedSavings);
-    const actualWants = parseAmount(analysis?.actualWants);
-    const actualSavings = parseAmount(analysis?.actualSavings);
+    const recommendedWants = parseAmount(analysis.recommendedWants);
+    const recommendedSavings = parseAmount(analysis.recommendedSavings);
+    const actualWants = parseAmount(analysis.actualWants);
+    const actualSavings = parseAmount(analysis.actualSavings);
 
     let extraSource: "wants" | "savings" | "none" = "none";
     let extraAmount = 0;
@@ -314,7 +317,7 @@ export default function Results({ params }: ResultsProps) {
       extraSource,
       extraAmount,
     };
-  }, [analysis.actualSavings, analysis.actualWants, analysis.recommendedSavings, analysis.recommendedWants, debts, monthlyIncome]);
+  }, [analysis, debts, monthlyIncome, t]);
 
   const debtPlan = useMemo(() => {
     const normalizedDebts = debts
@@ -405,6 +408,18 @@ export default function Results({ params }: ResultsProps) {
     const monthsToDebtFree = rows.length ? rows[rows.length - 1].month : null;
     return { rows, monthsToHealthy, monthsToDebtFree };
   }, [debts, debtMetrics.extraAmount, monthlyIncome]);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return t("history.statusCompleted");
+      case "failed":
+        return t("history.statusFailed");
+      case "pending":
+      default:
+        return t("history.statusPending");
+    }
+  };
 
   return (
     <div className="max-w-md mx-auto p-4 pt-8">
@@ -709,7 +724,7 @@ export default function Results({ params }: ResultsProps) {
                                     }
                                     data-testid={`status-${historyItem.id}`}
                                   >
-                                    {historyItem.analysisStatus}
+                                    {getStatusLabel(historyItem.analysisStatus)}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -790,7 +805,7 @@ export default function Results({ params }: ResultsProps) {
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-gray-900">{t("results.debtList")}</h4>
                         <span className="text-sm text-gray-500">
-                          {debtsLoading ? t("debt.loading") : `${debts.length} item(s)`}
+                          {debtsLoading ? t("debt.loading") : t("results.debtCount", { count: debts.length })}
                         </span>
                       </div>
                       {debts.length === 0 ? (
@@ -806,7 +821,10 @@ export default function Results({ params }: ResultsProps) {
                               <div>
                                 <div className="font-medium text-gray-900">{debt.name}</div>
                                 <div className="text-xs text-gray-500">
-                                  Total: ${formatCurrency(parseAmount(debt.totalAmount))} • Monthly: ${formatCurrency(parseAmount(debt.monthlyPayment))}
+                                  {t("results.debtSummary", {
+                                    total: `$${formatCurrency(parseAmount(debt.totalAmount))}`,
+                                    monthly: `$${formatCurrency(parseAmount(debt.monthlyPayment))}`,
+                                  })}
                                 </div>
                               </div>
                               <Button
@@ -874,7 +892,7 @@ export default function Results({ params }: ResultsProps) {
                                   <TableHead className="text-right">{t("results.totalPayment")}</TableHead>
                                   <TableHead className="text-right">{t("results.extraApplied")}</TableHead>
                                   <TableHead className="text-right">{t("results.remainingBalance")}</TableHead>
-                                  <TableHead className="text-right">DTI</TableHead>
+                                  <TableHead className="text-right">{t("results.dtiShort")}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>

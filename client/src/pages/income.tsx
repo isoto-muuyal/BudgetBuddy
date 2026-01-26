@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { DollarSign, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { incomeSchema, type IncomeInput } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 export default function Income() {
   const [, setLocation] = useLocation();
   const [budget, setBudget] = useState({ needs: 0, wants: 0, savings: 0 });
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const form = useForm({
     resolver: zodResolver(incomeSchema),
@@ -23,6 +25,16 @@ export default function Income() {
       monthlyIncome: "",
     },
   });
+
+  const { data: userProfile } = useQuery<any>({
+    queryKey: ["/api/user/profile"],
+  });
+
+  useEffect(() => {
+    if (userProfile?.monthlyIncome) {
+      form.setValue("monthlyIncome", userProfile.monthlyIncome.toString(), { shouldValidate: true });
+    }
+  }, [form, userProfile?.monthlyIncome]);
 
   const watchIncome = form.watch("monthlyIncome");
 
@@ -42,14 +54,13 @@ export default function Income() {
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Monthly income updated successfully",
+        title: t("income.updatedTitle"),
+        description: t("income.updatedDesc"),
       });
-      setLocation("/budget");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -69,10 +80,10 @@ export default function Income() {
               <DollarSign className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-income-title">
-              Monthly Income
+              {t("income.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-income-description">
-              Enter your monthly after-tax income to calculate your budget
+              {t("income.description")}
             </p>
           </div>
 
@@ -83,7 +94,7 @@ export default function Income() {
                 name="monthlyIncome"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monthly Income (After Taxes)</FormLabel>
+                    <FormLabel>{t("income.label")}</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <span className="absolute left-4 top-3 text-gray-500 text-lg">$</span>
@@ -104,18 +115,18 @@ export default function Income() {
               />
 
               <div className="bg-blue-50 p-4 rounded-lg" data-testid="card-budget-preview">
-                <h3 className="font-medium text-gray-900 mb-2">The 50/30/20 Rule</h3>
+                <h3 className="font-medium text-gray-900 mb-2">{t("income.ruleTitle")}</h3>
                 <div className="space-y-1 text-sm text-gray-600">
                   <div className="flex justify-between">
-                    <span>• 50% for Needs (essentials)</span>
+                    <span>{t("income.needs")}</span>
                     <span data-testid="text-needs-amount">${budget.needs.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>• 30% for Wants (desires)</span>
+                    <span>{t("income.wants")}</span>
                     <span data-testid="text-wants-amount">${budget.wants.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>• 20% for Savings</span>
+                    <span>{t("income.savings")}</span>
                     <span data-testid="text-savings-amount">${budget.savings.toFixed(2)}</span>
                   </div>
                 </div>
@@ -127,8 +138,16 @@ export default function Income() {
                 disabled={incomeMutation.isPending}
                 data-testid="button-calculate"
               >
-                {incomeMutation.isPending ? "Calculating..." : "Calculate Budget"}
+                {incomeMutation.isPending ? t("income.calculating") : t("income.calculate")}
               </Button> 
+              <Button
+                type="button"
+                className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                onClick={() => setLocation("/upload")}
+                data-testid="button-upload-new"
+              >
+                {t("income.upload")}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -136,7 +155,7 @@ export default function Income() {
                 onClick={() => setLocation("/history")}
                 data-testid="button-view-history">
                   <History className="w-4 h-4 mr-2" />
-                  View Previous Reports
+                  {t("income.history")}
               </Button>
             </form>
           </Form>

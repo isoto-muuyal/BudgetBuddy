@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { resetPasswordSchema, type ResetPasswordInput } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
@@ -18,6 +19,7 @@ export default function ResetPassword() {
   const [token, setToken] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,8 +43,8 @@ export default function ResetPassword() {
     onSuccess: (data) => {
       setResetSuccess(true);
       toast({
-        title: "Success",
-        description: data.message,
+        title: t("reset.successTitle"),
+        description: data.message || t("reset.successDesc"),
       });
       setTimeout(() => {
         setLocation("/login");
@@ -50,7 +52,7 @@ export default function ResetPassword() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -60,8 +62,8 @@ export default function ResetPassword() {
   const onSubmit = (data: ResetPasswordInput) => {
     if (!token) {
       toast({
-        title: "Error",
-        description: "Invalid or missing reset token",
+        title: t("common.error"),
+        description: t("reset.invalidToken"),
         variant: "destructive",
       });
       return;
@@ -76,12 +78,12 @@ export default function ResetPassword() {
         <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
           <CardContent className="p-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("reset.invalidTitle")}</h2>
               <p className="text-gray-600 mb-6">
-                The password reset link is invalid or has expired.
+                {t("reset.invalidDesc")}
               </p>
               <Link href="/forgot-password" className="text-brand-blue hover:text-brand-dark font-medium">
-                Request a new reset link
+                {t("reset.requestLink")}
               </Link>
             </div>
           </CardContent>
@@ -99,12 +101,12 @@ export default function ResetPassword() {
               <Lock className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-reset-password-title">
-              Reset Password
+              {t("reset.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-reset-password-description">
               {resetSuccess
-                ? "Your password has been reset successfully!"
-                : "Enter your new password below"}
+                ? t("reset.successDesc")
+                : t("reset.description")}
             </p>
           </div>
 
@@ -116,13 +118,13 @@ export default function ResetPassword() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>New Password</FormLabel>
+                      <FormLabel>{t("reset.password")}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your new password"
+                            placeholder={t("reset.password")}
                             className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
                             data-testid="input-password"
                           />
@@ -149,21 +151,21 @@ export default function ResetPassword() {
                   disabled={resetPasswordMutation.isPending}
                   data-testid="button-submit"
                 >
-                  {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                  {resetPasswordMutation.isPending ? t("reset.submitting") : t("reset.submit")}
                 </Button>
               </form>
             </Form>
           ) : (
             <div className="text-center space-y-4">
               <p className="text-gray-600" data-testid="text-reset-success">
-                Redirecting you to login...
+                {t("reset.redirecting")}
               </p>
             </div>
           )}
 
           <div className="text-center mt-6">
             <Link href="/login" className="text-brand-blue hover:text-brand-dark font-medium" data-testid="link-back-to-login">
-              Back to Login
+              {t("reset.back")}
             </Link>
           </div>
         </CardContent>

@@ -1,4 +1,5 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
+import i18n from "@/i18n";
 
 interface ExpenseItem {
   description: string;
@@ -203,6 +204,7 @@ const styles = StyleSheet.create({
 });
 
 const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
+  const t = i18n.t.bind(i18n);
   const monthlyIncome = parseFloat(data.analysis.monthlyIncome) || 0;
   const safePercentage = (amount: string, income: number) => {
     const parsedAmount = parseFloat(amount) || 0;
@@ -217,13 +219,13 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
     try {
       return new Date(dateString).toLocaleDateString();
     } catch {
-      return 'Unknown';
+      return t("pdf.unknown");
     }
   };
   
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return isNaN(num) ? '$0.00' : `$${num.toFixed(2)}`;
+    return isNaN(num) ? "$0.00" : `$${num.toFixed(2)}`;
   };
 
   const getCategoryStyle = (category: string) => {
@@ -237,10 +239,10 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
   const getCategoryText = (category: string) => {
     switch (category) {
-      case "50%": return "Needs";
-      case "30%": return "Wants";
-      case "20%": return "Savings";
-      default: return "Unclear";
+      case "50%": return t("results.needs");
+      case "30%": return t("results.wants");
+      case "20%": return t("results.savings");
+      default: return t("results.unclear");
     }
   };
 
@@ -248,29 +250,45 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.title}>BudgetWise - Expense Analysis Report</Text>
-          <Text style={styles.subtitle}>Generated on {new Date().toLocaleDateString()}</Text>
-          <Text style={styles.subtitle}>Analysis ID: {data.analysis.id}</Text>
+          <Text style={styles.title}>
+            {t("pdf.title", { appName: t("appName") })}
+          </Text>
+          <Text style={styles.subtitle}>
+            {t("pdf.generatedOn", { date: new Date().toLocaleDateString() })}
+          </Text>
+          <Text style={styles.subtitle}>
+            {t("pdf.analysisId", { id: data.analysis.id })}
+          </Text>
         </View>
 
         <View style={styles.userInfo}>
-          <Text style={styles.userInfoTitle}>User Information</Text>
-          <Text style={styles.userInfoText}>Name: {data.user.fullName}</Text>
-          <Text style={styles.userInfoText}>Email: {data.user.email}</Text>
-          <Text style={styles.userInfoText}>Monthly Income: {formatCurrency(data.analysis.monthlyIncome)}</Text>
-          <Text style={styles.userInfoText}>Statement File: {data.analysis.originalFileName || 'Unknown'}</Text>
-          <Text style={styles.userInfoText}>Upload Date: {formatDate(data.analysis.uploadDate)}</Text>
+          <Text style={styles.userInfoTitle}>{t("pdf.userInfoTitle")}</Text>
+          <Text style={styles.userInfoText}>
+            {t("pdf.userName", { name: data.user.fullName })}
+          </Text>
+          <Text style={styles.userInfoText}>
+            {t("pdf.userEmail", { email: data.user.email })}
+          </Text>
+          <Text style={styles.userInfoText}>
+            {t("pdf.monthlyIncome", { income: formatCurrency(data.analysis.monthlyIncome) })}
+          </Text>
+          <Text style={styles.userInfoText}>
+            {t("pdf.statementFile", { file: data.analysis.originalFileName || t("pdf.unknown") })}
+          </Text>
+          <Text style={styles.userInfoText}>
+            {t("pdf.uploadDate", { date: formatDate(data.analysis.uploadDate) })}
+          </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Budget Comparison - 50/30/20 Rule</Text>
+          <Text style={styles.sectionTitle}>{t("pdf.budgetComparisonTitle")}</Text>
           <View style={styles.budgetComparison}>
             <View style={styles.budgetColumn}>
-              <Text style={styles.budgetColumnTitle}>Your Current Spending</Text>
+              <Text style={styles.budgetColumnTitle}>{t("pdf.currentSpending")}</Text>
               
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.needsColor]}>Needs</Text>
+                  <Text style={[styles.budgetItemLabel, styles.needsColor]}>{t("results.needs")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.needsColor]}>{actualNeedsPercent}%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.actualNeeds)}</Text>
@@ -278,7 +296,7 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.wantsColor]}>Wants</Text>
+                  <Text style={[styles.budgetItemLabel, styles.wantsColor]}>{t("results.wants")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.wantsColor]}>{actualWantsPercent}%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.actualWants)}</Text>
@@ -286,7 +304,7 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.savingsColor]}>Savings</Text>
+                  <Text style={[styles.budgetItemLabel, styles.savingsColor]}>{t("results.savings")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.savingsColor]}>{actualSavingsPercent}%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.actualSavings)}</Text>
@@ -294,11 +312,11 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
             </View>
 
             <View style={styles.budgetColumn}>
-              <Text style={styles.budgetColumnTitle}>Recommended (50/30/20)</Text>
+              <Text style={styles.budgetColumnTitle}>{t("pdf.recommended")}</Text>
               
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>Needs</Text>
+                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>{t("results.needs")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.recommendedColor]}>50%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.recommendedNeeds)}</Text>
@@ -306,7 +324,7 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>Wants</Text>
+                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>{t("results.wants")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.recommendedColor]}>30%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.recommendedWants)}</Text>
@@ -314,7 +332,7 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
               <View style={styles.budgetItem}>
                 <View style={styles.budgetItemHeader}>
-                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>Savings</Text>
+                  <Text style={[styles.budgetItemLabel, styles.recommendedColor]}>{t("results.savings")}</Text>
                   <Text style={[styles.budgetItemPercent, styles.recommendedColor]}>20%</Text>
                 </View>
                 <Text style={styles.budgetItemAmount}>{formatCurrency(data.analysis.recommendedSavings)}</Text>
@@ -325,16 +343,19 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 
         {data.analysis.recommendations && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI Recommendations</Text>
+            <Text style={styles.sectionTitle}>{t("pdf.aiRecommendations")}</Text>
             <View style={styles.recommendationsBox}>
-              <Text style={styles.recommendationsTitle}>🤖 Financial Advice</Text>
+              <Text style={styles.recommendationsTitle}>{t("pdf.aiAdviceTitle")}</Text>
               <Text style={styles.recommendationsText}>{data.analysis.recommendations}</Text>
             </View>
           </View>
         )}
 
         <Text style={styles.footer}>
-          Generated by BudgetWise - Personal Finance Management • {new Date().toLocaleDateString()}
+          {t("pdf.footer", {
+            appName: t("appName"),
+            date: new Date().toLocaleDateString(),
+          })}
         </Text>
       </Page>
 
@@ -342,12 +363,14 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
       {data.analysis.expenses && data.analysis.expenses.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Text style={styles.title}>Detailed Expense Breakdown</Text>
-            <Text style={styles.subtitle}>Complete transaction analysis</Text>
+            <Text style={styles.title}>{t("pdf.breakdownTitle")}</Text>
+            <Text style={styles.subtitle}>{t("pdf.breakdownSubtitle")}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>All Transactions ({data.analysis.expenses.length} items)</Text>
+            <Text style={styles.sectionTitle}>
+              {t("pdf.allTransactions", { count: data.analysis.expenses.length })}
+            </Text>
             <View style={styles.expensesList}>
               {data.analysis.expenses.map((expense, index) => (
                 <View key={index} style={styles.expenseItem}>
@@ -371,7 +394,7 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
           </View>
 
           <Text style={styles.footer}>
-            Generated by BudgetWise - Personal Finance Management • Page 2 of 2
+            {t("pdf.footerPageTwo", { appName: t("appName") })}
           </Text>
         </Page>
       )}
@@ -380,11 +403,16 @@ const ExpenseReportPDF = ({ data }: { data: ReportData }) => {
 };
 
 export const generateAndDownloadPDF = async (data: ReportData) => {
+  const t = i18n.t.bind(i18n);
   const blob = await pdf(<ExpenseReportPDF data={data} />).toBlob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `BudgetWise-Report-${data.user.fullName.replace(/\s+/g, '-')}-${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`;
+  link.download = t("pdf.fileName", {
+    appName: t("appName"),
+    name: data.user.fullName.replace(/\s+/g, "-"),
+    date: new Date().toLocaleDateString().replace(/\//g, "-"),
+  });
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

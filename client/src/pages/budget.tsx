@@ -4,9 +4,11 @@ import { PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "react-i18next";
 
 export default function Budget() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/user/profile"],
@@ -47,22 +49,22 @@ export default function Budget() {
               <PieChart className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-budget-title">
-              Your Budget Plan
+              {t("budget.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-budget-description">
-              Based on monthly income of ${monthlyIncome.toFixed(2)}
+              {t("budget.description", { income: `$${monthlyIncome.toFixed(2)}` })}
             </p>
           </div>
 
           <div className="space-y-4 mb-8">
             <div className="needs-bg p-4 rounded-lg border" data-testid="card-needs">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold needs-text">Needs (50%)</h3>
+                <h3 className="font-semibold needs-text">{t("budget.needs")}</h3>
                 <span className="text-xl font-bold needs-text" data-testid="text-needs-amount">
                   ${needs.toFixed(2)}
                 </span>
               </div>
-              <p className="text-sm text-gray-600">Rent, groceries, utilities, minimum debt payments</p>
+              <p className="text-sm text-gray-600">{t("budget.needsDesc")}</p>
               <div className="w-full bg-green-200 rounded-full h-2 mt-2">
                 <div className="bg-green-500 h-2 rounded-full" style={{ width: "50%" }}></div>
               </div>
@@ -70,12 +72,12 @@ export default function Budget() {
 
             <div className="wants-bg p-4 rounded-lg border" data-testid="card-wants">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold wants-text">Wants (30%)</h3>
+                <h3 className="font-semibold wants-text">{t("budget.wants")}</h3>
                 <span className="text-xl font-bold wants-text" data-testid="text-wants-amount">
                   ${wants.toFixed(2)}
                 </span>
               </div>
-              <p className="text-sm text-gray-600">Entertainment, dining out, hobbies, subscriptions</p>
+              <p className="text-sm text-gray-600">{t("budget.wantsDesc")}</p>
               <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
                 <div className="bg-blue-500 h-2 rounded-full" style={{ width: "30%" }}></div>
               </div>
@@ -83,12 +85,12 @@ export default function Budget() {
 
             <div className="savings-bg p-4 rounded-lg border" data-testid="card-savings">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold savings-text">Savings (20%)</h3>
+                <h3 className="font-semibold savings-text">{t("budget.savings")}</h3>
                 <span className="text-xl font-bold savings-text" data-testid="text-savings-amount">
                   ${savings.toFixed(2)}
                 </span>
               </div>
-              <p className="text-sm text-gray-600">Emergency fund, retirement, investments</p>
+              <p className="text-sm text-gray-600">{t("budget.savingsDesc")}</p>
               <div className="w-full bg-purple-200 rounded-full h-2 mt-2">
                 <div className="bg-purple-500 h-2 rounded-full" style={{ width: "20%" }}></div>
               </div>
@@ -100,7 +102,7 @@ export default function Budget() {
             className="w-full bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
             data-testid="button-upload"
           >
-            Upload expenses file
+            {t("budget.upload")}
           </Button>
         </CardContent>
       </Card>

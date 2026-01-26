@@ -11,10 +11,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { forgotPasswordSchema, type ForgotPasswordInput } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 export default function ForgotPassword() {
   const [emailSent, setEmailSent] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const form = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -31,13 +33,13 @@ export default function ForgotPassword() {
     onSuccess: (data) => {
       setEmailSent(true);
       toast({
-        title: "Email Sent",
+        title: t("forgot.emailSent"),
         description: data.message,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -57,12 +59,12 @@ export default function ForgotPassword() {
               <Mail className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-forgot-password-title">
-              Forgot Password?
+              {t("forgot.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-forgot-password-description">
               {emailSent
-                ? "Check your email for a password reset link"
-                : "Enter your email address and we'll send you a link to reset your password"}
+                ? t("forgot.descSent")
+                : t("forgot.descPrompt")}
             </p>
           </div>
 
@@ -74,12 +76,12 @@ export default function ForgotPassword() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("forgot.email")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="email"
-                          placeholder="Enter your email"
+                          placeholder={t("forgot.email")}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
                           data-testid="input-email"
                         />
@@ -95,14 +97,14 @@ export default function ForgotPassword() {
                   disabled={forgotPasswordMutation.isPending}
                   data-testid="button-submit"
                 >
-                  {forgotPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
+                  {forgotPasswordMutation.isPending ? t("forgot.submitting") : t("forgot.submit")}
                 </Button>
               </form>
             </Form>
           ) : (
             <div className="text-center space-y-4">
               <p className="text-gray-600" data-testid="text-email-sent">
-                We've sent a password reset link to your email address. Please check your inbox and follow the instructions.
+                {t("forgot.sentBody")}
               </p>
               <Button
                 onClick={() => setEmailSent(false)}
@@ -110,14 +112,14 @@ export default function ForgotPassword() {
                 className="w-full"
                 data-testid="button-send-another"
               >
-                Send Another Link
+                {t("forgot.sendAnother")}
               </Button>
             </div>
           )}
 
           <div className="text-center mt-6">
             <Link href="/login" className="text-brand-blue hover:text-brand-dark font-medium" data-testid="link-back-to-login">
-              Back to Login
+              {t("forgot.back")}
             </Link>
           </div>
         </CardContent>

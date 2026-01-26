@@ -12,11 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, setAuthToken } from "@/lib/queryClient";
 import { loginSchema, type LoginUser } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -24,7 +26,7 @@ export default function Login() {
     const token = params.get("token");
     if (error) {
       toast({
-        title: "Google sign-in failed",
+        title: t("login.googleErrorTitle"),
         description: error.replace(/\+/g, " "),
         variant: "destructive",
       });
@@ -36,12 +38,12 @@ export default function Login() {
       const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
       window.history.replaceState({}, "", cleanUrl);
       toast({
-        title: "Success",
-        description: "Logged in with Google",
+        title: t("login.successTitle"),
+        description: t("login.successDesc"),
       });
       setLocation("/income");
     }
-  }, [setLocation, toast]);
+  }, [setLocation, t, toast]);
 
   const form = useForm<LoginUser>({
     resolver: zodResolver(loginSchema),
@@ -63,15 +65,15 @@ export default function Login() {
         setAuthToken(data.token);
       }
       toast({
-        title: "Success",
-        description: "Logged in successfully",
+        title: t("login.googleSuccessTitle"),
+        description: t("login.googleSuccessDesc"),
       });
       setLocation("/income");
     },
     onError: (error: Error) => {
       console.log("Login error:", error);
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -91,10 +93,10 @@ export default function Login() {
               <User className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-login-title">
-              Welcome Back
+              {t("login.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-login-description">
-              Sign in to your BudgetWise account
+              {t("login.description")}
             </p>
           </div>
 
@@ -105,15 +107,15 @@ export default function Login() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("login.email")}</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="Enter your email"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
-                        data-testid="input-email"
-                      />
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder={t("login.email")}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
+                          data-testid="input-email"
+                        />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -125,13 +127,13 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("login.password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
                           {...field}
                           type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
+                          placeholder={t("login.password")}
                           className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
                           data-testid="input-password"
                         />
@@ -156,11 +158,11 @@ export default function Login() {
                 <div className="flex items-center space-x-2">
                   <Checkbox id="remember" data-testid="checkbox-remember" />
                   <label htmlFor="remember" className="text-sm text-gray-600">
-                    Remember me
+                    {t("login.remember")}
                   </label>
                 </div>
               <Link href="/forgot-password" className="text-sm text-brand-blue hover:text-brand-dark" data-testid="link-forgot-password"> 
-                    Forgot password?
+                    {t("login.forgot")}
                 </Link>
               </div>
 
@@ -170,14 +172,14 @@ export default function Login() {
                 disabled={loginMutation.isPending}
                 data-testid="button-submit"
               >
-                {loginMutation.isPending ? "Signing In..." : "Sign In"}
+                {loginMutation.isPending ? t("login.submitting") : t("login.submit")}
               </Button>
             </form>
           </Form>
 
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">or</span>
+            <span className="text-xs text-gray-400">{t("common.or")}</span>
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
@@ -190,13 +192,13 @@ export default function Login() {
             data-testid="button-google-login"
           >
             <Chrome className="mr-2 h-4 w-4" />
-            Continue with Google
+            {t("login.google")}
           </Button>
 
           <div className="text-center mt-6">
-            <span className="text-gray-600">Don't have an account? </span>
+            <span className="text-gray-600">{t("login.noAccount")} </span>
             <Link href="/signup" className="text-brand-blue hover:text-brand-dark font-medium" data-testid="link-signup">
-              Sign up
+              {t("login.signup")}
             </Link>
           </div>
         </CardContent>

@@ -6,13 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useTranslation } from "react-i18next";
 
 export default function History() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   const { data: analysisHistory, isLoading } = useQuery<any[]>({
     queryKey: ["/api/analysis"],
   });
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return t("history.statusCompleted");
+      case "failed":
+        return t("history.statusFailed");
+      case "pending":
+      default:
+        return t("history.statusPending");
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-4 pt-8">
@@ -21,14 +35,14 @@ export default function History() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl font-bold text-gray-900 flex items-center">
               <BarChart3 className="mr-3 text-blue-500 h-8 w-8" />
-              Analysis History
+              {t("history.title")}
             </CardTitle>
             <Button
               onClick={() => setLocation("/upload")}
               className="bg-blue-400 text-white hover:bg-blue-600"
               data-testid="button-new-analysis"
             >
-              New Analysis
+              {t("history.newAnalysis")}
             </Button>
           </div>
         </CardHeader>
@@ -42,14 +56,14 @@ export default function History() {
           ) : !analysisHistory || analysisHistory.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <FileText className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-              <p className="text-lg font-medium">No previous analyses found</p>
-              <p className="text-sm mb-6">Upload your first bank statement to get started!</p>
+              <p className="text-lg font-medium">{t("history.emptyTitle")}</p>
+              <p className="text-sm mb-6">{t("history.emptyDesc")}</p>
               <Button
                 onClick={() => setLocation("/upload")}
                 className="bg-blue-400 text-white hover:bg-blue-600"
                 data-testid="button-upload-first"
               >
-                Upload Statement
+                {t("history.uploadFirst")}
               </Button>
             </div>
           ) : (
@@ -57,13 +71,13 @@ export default function History() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[250px]">File Name</TableHead>
-                    <TableHead>Upload Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Needs</TableHead>
-                    <TableHead className="text-right">Wants</TableHead>
-                    <TableHead className="text-right">Savings</TableHead>
-                    <TableHead className="w-[100px]">Action</TableHead>
+                    <TableHead className="w-[250px]">{t("history.fileName")}</TableHead>
+                    <TableHead>{t("history.uploadDate")}</TableHead>
+                    <TableHead>{t("history.status")}</TableHead>
+                    <TableHead className="text-right">{t("history.needs")}</TableHead>
+                    <TableHead className="text-right">{t("history.wants")}</TableHead>
+                    <TableHead className="text-right">{t("history.savings")}</TableHead>
+                    <TableHead className="w-[100px]">{t("history.action")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -89,18 +103,18 @@ export default function History() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={
-                              historyItem.analysisStatus === "completed" 
-                                ? "default" 
-                                : historyItem.analysisStatus === "failed" 
-                                ? "destructive" 
-                                : "secondary"
-                            }
-                            data-testid={`status-${historyItem.id}`}
-                          >
-                            {historyItem.analysisStatus}
-                          </Badge>
+                        <Badge 
+                          variant={
+                            historyItem.analysisStatus === "completed" 
+                              ? "default" 
+                              : historyItem.analysisStatus === "failed" 
+                              ? "destructive" 
+                              : "secondary"
+                          }
+                          data-testid={`status-${historyItem.id}`}
+                        >
+                          {getStatusLabel(historyItem.analysisStatus)}
+                        </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           {historyItem.actualNeeds ? `$${parseFloat(historyItem.actualNeeds).toFixed(0)}` : "-"}
@@ -115,13 +129,13 @@ export default function History() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setLocation(`/results/${historyItem.id}`)}
-                            data-testid={`button-view-${historyItem.id}`}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                          onClick={() => setLocation(`/results/${historyItem.id}`)}
+                          data-testid={`button-view-${historyItem.id}`}
+                        >
+                          {t("history.view")}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                     ))}
                 </TableBody>
               </Table>

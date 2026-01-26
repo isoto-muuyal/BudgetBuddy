@@ -7,12 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthToken } from "@/lib/queryClient";
+import { useTranslation } from "react-i18next";
 
 export default function UploadPage() {
   const [, setLocation] = useLocation();
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -43,14 +45,14 @@ export default function UploadPage() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Success",
-        description: "File uploaded successfully! Starting analysis...",
+        title: t("upload.successTitle"),
+        description: t("upload.successDesc"),
       });
       setLocation(`/results/${data.analysisId}`);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -86,8 +88,8 @@ export default function UploadPage() {
       
       if (!validTypes.includes(file.type)) {
         toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF or Excel file",
+          title: t("upload.invalidTitle"),
+          description: t("upload.invalidDesc"),
           variant: "destructive",
         });
         return;
@@ -112,10 +114,10 @@ export default function UploadPage() {
               <Upload className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-upload-title">
-              Upload Statement
+              {t("upload.title")}
             </h2>
             <p className="text-gray-600" data-testid="text-upload-description">
-              Upload your bank statement or Excel file for analysis
+              {t("upload.description")}
             </p>
           </div>
 
@@ -127,11 +129,11 @@ export default function UploadPage() {
             <div className="space-y-4">
               <CloudUpload className="text-4xl text-gray-400 mx-auto" />
               <div>
-                <p className="text-lg font-medium text-gray-900">Drop your file here</p>
-                <p className="text-sm text-gray-500">or click to browse</p>
+                <p className="text-lg font-medium text-gray-900">{t("upload.dropTitle")}</p>
+                <p className="text-sm text-gray-500">{t("upload.dropSubtitle")}</p>
               </div>
               <div className="text-xs text-gray-400">
-                Supports: PDF, Excel (.xlsx, .xls), CSV
+                {t("upload.supports")}
               </div>
             </div>
             <input
@@ -152,7 +154,7 @@ export default function UploadPage() {
                     {selectedFile.name}
                   </span>
                   <span className="text-sm text-gray-500" data-testid="text-upload-status">
-                    {uploadProgress < 100 ? "Uploading..." : "Ready"}
+                    {uploadProgress < 100 ? t("upload.uploadStatus") : t("upload.readyStatus")}
                   </span>
                 </div>
                 <Progress value={uploadProgress} className="w-full" data-testid="progress-upload" />
@@ -169,7 +171,7 @@ export default function UploadPage() {
               }`}
               data-testid="button-analyze"
             >
-              {uploadMutation.isPending ? "Analyzing..." : "Analyze Expenses"}
+              {uploadMutation.isPending ? t("upload.analyzing") : t("upload.analyze")}
             </Button>
           </div>
         </CardContent>
