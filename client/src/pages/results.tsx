@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateAndDownloadPDF } from "@/components/ExpenseReportPDF";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ResultsProps {
   params: { id: string };
@@ -22,6 +23,7 @@ export default function Results({ params }: ResultsProps) {
   const [, setLocation] = useLocation();
   const analysisId = params.id;
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [debtForm, setDebtForm] = useState({
     name: "",
@@ -64,14 +66,14 @@ export default function Results({ params }: ResultsProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
       setDebtForm({ name: "", totalAmount: "", monthlyPayment: "" });
       toast({
-        title: "Success",
-        description: "Debt added successfully.",
+        title: t("common.success"),
+        description: t("results.debtAdded"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error?.message || "Failed to add debt.",
+        title: t("common.error"),
+        description: error?.message || t("results.debtAddFailed"),
         variant: "destructive",
       });
     },
@@ -114,9 +116,9 @@ export default function Results({ params }: ResultsProps) {
       <div className="max-w-md mx-auto p-4 pt-8">
         <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
           <CardContent className="p-8 text-center">
-            <p className="text-gray-600">Analysis not found</p>
+            <p className="text-gray-600">{t("results.notFound")}</p>
             <Button onClick={() => setLocation("/upload")} className="mt-4">
-              Upload New Statement
+              {t("results.uploadNew")}
             </Button>
           </CardContent>
         </Card>
@@ -146,8 +148,8 @@ export default function Results({ params }: ResultsProps) {
   const handleDownloadReport = async () => {
     if (!analysis || !userProfile) {
       toast({
-        title: "Error",
-        description: "Unable to generate report. Missing data.",
+        title: t("common.error"),
+        description: t("results.reportMissing"),
         variant: "destructive",
       });
       return;
@@ -178,14 +180,14 @@ export default function Results({ params }: ResultsProps) {
 
       await generateAndDownloadPDF(reportData);
       toast({
-        title: "Success",
-        description: "Report downloaded successfully!",
+        title: t("common.success"),
+        description: t("results.reportDownloaded"),
       });
     } catch (error) {
       console.error("PDF generation error:", error);
       toast({
-        title: "Error",
-        description: "Failed to generate PDF report. Please try again.",
+        title: t("common.error"),
+        description: t("results.reportFailed"),
         variant: "destructive",
       });
     } finally {
@@ -196,8 +198,8 @@ export default function Results({ params }: ResultsProps) {
   const handleAddDebt = () => {
     if (!debtForm.name || !debtForm.totalAmount || !debtForm.monthlyPayment) {
       toast({
-        title: "Error",
-        description: "Please fill in all debt fields.",
+        title: t("common.error"),
+        description: t("results.debtFieldsMissing"),
         variant: "destructive",
       });
       return;
@@ -213,8 +215,8 @@ export default function Results({ params }: ResultsProps) {
   const handleDownloadRecommendations = () => {
     if (!analysis?.recommendations) {
       toast({
-        title: "Error",
-        description: "No recommendations available to download.",
+        title: t("common.error"),
+        description: t("results.recsMissing"),
         variant: "destructive",
       });
       return;
@@ -243,10 +245,12 @@ export default function Results({ params }: ResultsProps) {
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Success",
-      description: "Recommendations downloaded successfully!",
+      title: t("common.success"),
+      description: t("results.recsDownloaded"),
     });
   };
+
+  const defaultTab = new URLSearchParams(window.location.search).get("tab") || "analysis";
 
   const parseAmount = (value: unknown) => {
     const num = typeof value === "string" ? Number.parseFloat(value) : Number(value);
@@ -258,6 +262,18 @@ export default function Results({ params }: ResultsProps) {
   };
 
   const debtMetrics = useMemo(() => {
+
+    // Add a guard clause at the top of the memo
+  if (!analysis) {
+    return {
+      totalMonthlyDebtPayments: 0,
+      dti: 0,
+      dtiCategory: "N/A",
+      extraSource: "none",
+      extraAmount: 0,
+    };
+  }
+
     const totalMonthlyDebtPayments = debts.reduce(
       (sum, debt) => sum + parseAmount(debt.monthlyPayment),
       0
@@ -275,10 +291,10 @@ export default function Results({ params }: ResultsProps) {
               ? "High Risk"
               : "Danger Zone";
 
-    const recommendedWants = parseAmount(analysis.recommendedWants);
-    const recommendedSavings = parseAmount(analysis.recommendedSavings);
-    const actualWants = parseAmount(analysis.actualWants);
-    const actualSavings = parseAmount(analysis.actualSavings);
+    const recommendedWants = parseAmount(analysis?.recommendedWants);
+    const recommendedSavings = parseAmount(analysis?.recommendedSavings);
+    const actualWants = parseAmount(analysis?.actualWants);
+    const actualSavings = parseAmount(analysis?.actualSavings);
 
     let extraSource: "wants" | "savings" | "none" = "none";
     let extraAmount = 0;
@@ -399,83 +415,83 @@ export default function Results({ params }: ResultsProps) {
               <BarChart3 className="text-white text-2xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-results-title">
-              Expense Analysis
+              {t("results.title")}
             </h2>
-          <p className="text-gray-600" data-testid="text-results-description">
-            AI analysis of your spending patterns
-          </p>
+            <p className="text-gray-600" data-testid="text-results-description">
+              {t("results.description")}
+            </p>
           </div>
 
-          <Tabs defaultValue="analysis" className="mt-6">
+          <Tabs defaultValue={defaultTab} className="mt-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
-              <TabsTrigger value="debt">Debt Plan</TabsTrigger>
+              <TabsTrigger value="analysis">{t("results.title")}</TabsTrigger>
+              <TabsTrigger value="history">{t("results.history")}</TabsTrigger>
+              <TabsTrigger value="debt">{t("results.debtPlan")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="analysis">
               {/* Current vs Recommended Comparison */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">Your Current Spending</h3>
+                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">{t("results.current")}</h3>
                   {isProcessing ? (
                     <div className="space-y-2">
                       <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                         <div className="flex items-center justify-center py-2">
                           <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">Analyzing...</span>
+                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
                         </div>
                       </div>
                       <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                         <div className="flex items-center justify-center py-2">
                           <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">Analyzing...</span>
+                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
                         </div>
                       </div>
                       <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                         <div className="flex items-center justify-center py-2">
                           <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">Analyzing...</span>
+                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
                         </div>
                       </div>
                     </div>
                   ) : hasFailed ? (
                     <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                      <p className="text-sm text-red-800 text-center">Analysis failed. Please try uploading your file again.</p>
+                      <p className="text-sm text-red-800 text-center">{t("results.failed")}</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                         <div className="flex justify-between">
-                          <span className="text-sm text-red-800">Needs</span>
+                          <span className="text-sm text-red-800">{t("results.needs")}</span>
                           <span className="font-semibold text-red-800" data-testid="text-actual-needs-percent">
-                            {analysis.actualNeeds ? `${actualNeedsPercent}%` : "Calculating..."}
+                            {analysis.actualNeeds ? `${actualNeedsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
                         <div className="text-xs text-red-600" data-testid="text-actual-needs-amount">
-                          {analysis.actualNeeds ? `$${analysis.actualNeeds}` : "Calculating..."}
+                          {analysis.actualNeeds ? `$${analysis.actualNeeds}` : t("results.calculating")}
                         </div>
                       </div>
                       <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
                         <div className="flex justify-between">
-                          <span className="text-sm text-orange-800">Wants</span>
+                          <span className="text-sm text-orange-800">{t("results.wants")}</span>
                           <span className="font-semibold text-orange-800" data-testid="text-actual-wants-percent">
-                            {analysis.actualWants ? `${actualWantsPercent}%` : "Calculating..."}
+                            {analysis.actualWants ? `${actualWantsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
                         <div className="text-xs text-orange-600" data-testid="text-actual-wants-amount">
-                          {analysis.actualWants ? `$${analysis.actualWants}` : "Calculating..."}
+                          {analysis.actualWants ? `$${analysis.actualWants}` : t("results.calculating")}
                         </div>
                       </div>
                       <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                         <div className="flex justify-between">
-                          <span className="text-sm text-red-800">Savings</span>
+                          <span className="text-sm text-red-800">{t("results.savings")}</span>
                           <span className="font-semibold text-red-800" data-testid="text-actual-savings-percent">
-                            {analysis.actualSavings ? `${actualSavingsPercent}%` : "Calculating..."}
+                            {analysis.actualSavings ? `${actualSavingsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
                         <div className="text-xs text-red-600" data-testid="text-actual-savings-amount">
-                          {analysis.actualSavings ? `$${analysis.actualSavings}` : "Calculating..."}
+                          {analysis.actualSavings ? `$${analysis.actualSavings}` : t("results.calculating")}
                         </div>
                       </div>
                     </div>
@@ -483,25 +499,25 @@ export default function Results({ params }: ResultsProps) {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">Recommended</h3>
+                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">{t("results.recommended")}</h3>
                   <div className="space-y-2">
                     <div className="needs-bg p-3 rounded-lg border">
                       <div className="flex justify-between">
-                        <span className="text-sm needs-text">Needs</span>
+                        <span className="text-sm needs-text">{t("results.needs")}</span>
                         <span className="font-semibold needs-text">50%</span>
                       </div>
                       <div className="text-xs text-gray-600">${analysis.recommendedNeeds}</div>
                     </div>
                     <div className="wants-bg p-3 rounded-lg border">
                       <div className="flex justify-between">
-                        <span className="text-sm wants-text">Wants</span>
+                        <span className="text-sm wants-text">{t("results.wants")}</span>
                         <span className="font-semibold wants-text">30%</span>
                       </div>
                       <div className="text-xs text-gray-600">${analysis.recommendedWants}</div>
                     </div>
                     <div className="savings-bg p-3 rounded-lg border">
                       <div className="flex justify-between">
-                        <span className="text-sm savings-text">Savings</span>
+                        <span className="text-sm savings-text">{t("results.savings")}</span>
                         <span className="font-semibold savings-text">20%</span>
                       </div>
                       <div className="text-xs text-gray-600">${analysis.recommendedSavings}</div>
@@ -515,11 +531,11 @@ export default function Results({ params }: ResultsProps) {
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
                   <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                     <Bot className="text-brand-blue mr-2" />
-                    AI Recommendations
+                    {t("results.recommendations")}
                   </h3>
                   <div className="flex items-center text-sm text-gray-700">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    AI is analyzing your expenses and generating personalized recommendations...
+                    {t("results.recommendationsLoading")}
                   </div>
                 </div>
               )}
@@ -528,7 +544,7 @@ export default function Results({ params }: ResultsProps) {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-gray-900 flex items-center">
                       <Bot className="text-brand-blue mr-2" />
-                      AI Recommendations
+                      {t("results.recommendations")}
                     </h3>
                     <Button
                       variant="outline"
@@ -537,7 +553,7 @@ export default function Results({ params }: ResultsProps) {
                       data-testid="button-download-recommendations"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download
+                      {t("results.downloadRecs")}
                     </Button>
                   </div>
                   <div className="text-sm text-gray-700" data-testid="text-recommendations">
@@ -549,16 +565,16 @@ export default function Results({ params }: ResultsProps) {
               {/* Detailed Expense Breakdown */}
               {isProcessing && (
                 <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">{t("results.breakdown")}</h3>
                   <div className="bg-gray-50 p-6 rounded-lg text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">Processing your expenses...</p>
+                    <p className="text-sm text-gray-600">{t("results.processing")}</p>
                   </div>
                 </div>
               )}
               {!isProcessing && analysis.expenses && analysis.expenses.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Expense Breakdown</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">{t("results.breakdown")}</h3>
                   <ScrollArea className="h-60" data-testid="scroll-expenses">
                     <div className="space-y-3">
                       {analysis.expenses.map((expense: any, index: number) => (
@@ -594,7 +610,7 @@ export default function Results({ params }: ResultsProps) {
                   data-testid="button-upload-new"
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload New
+                  {t("results.uploadNew")}
                 </Button>
                 <Button
                   onClick={handleDownloadReport}
@@ -603,7 +619,7 @@ export default function Results({ params }: ResultsProps) {
                   data-testid="button-download"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  {isGeneratingPDF ? "Generating PDF..." : "Download Report"}
+                  {isGeneratingPDF ? t("results.generating") : t("results.download")}
                 </Button>
               </div>
             </TabsContent>
@@ -613,7 +629,7 @@ export default function Results({ params }: ResultsProps) {
                 <CardHeader>
                   <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
                     <FileText className="mr-2 text-blue-500" />
-                    Analysis History
+                    {t("results.history")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -621,12 +637,12 @@ export default function Results({ params }: ResultsProps) {
                     <div className="mb-4 bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center text-sm text-gray-600">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Generating historical patterns...
+                        {t("results.patternsLoading")}
                       </div>
                     </div>
                   ) : historyPatterns?.patterns ? (
                     <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-2">Historical Patterns</h4>
+                      <h4 className="font-semibold text-gray-900 mb-2">{t("results.patterns")}</h4>
                       <div className="text-sm text-gray-700 whitespace-pre-line">
                         {historyPatterns.patterns}
                       </div>
@@ -642,21 +658,21 @@ export default function Results({ params }: ResultsProps) {
                   ) : !analysisHistory || analysisHistory.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                      <p>No previous analyses found</p>
-                      <p className="text-sm">Upload your first bank statement to get started!</p>
+                      <p>{t("results.historyNone")}</p>
+                      <p className="text-sm">{t("results.historyHint")}</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[200px]">File Name</TableHead>
-                            <TableHead>Upload Date</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Needs</TableHead>
-                            <TableHead className="text-right">Wants</TableHead>
-                            <TableHead className="text-right">Savings</TableHead>
-                            <TableHead className="w-[100px]">Action</TableHead>
+                            <TableHead className="w-[200px]">{t("history.fileName")}</TableHead>
+                            <TableHead>{t("history.uploadDate")}</TableHead>
+                            <TableHead>{t("history.status")}</TableHead>
+                            <TableHead className="text-right">{t("history.needs")}</TableHead>
+                            <TableHead className="text-right">{t("history.wants")}</TableHead>
+                            <TableHead className="text-right">{t("history.savings")}</TableHead>
+                            <TableHead className="w-[100px]">{t("history.action")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -713,12 +729,12 @@ export default function Results({ params }: ResultsProps) {
                                       onClick={() => setLocation(`/results/${historyItem.id}`)}
                                       data-testid={`button-view-${historyItem.id}`}
                                     >
-                                      View
+                                      {t("history.view")}
                                     </Button>
                                   )}
                                   {historyItem.id === analysisId && (
                                     <Badge variant="outline" className="text-xs">
-                                      Current
+                                      {t("results.currentBadge")}
                                     </Badge>
                                   )}
                                 </TableCell>
@@ -735,26 +751,26 @@ export default function Results({ params }: ResultsProps) {
             <TabsContent value="debt">
               <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-debt-plan">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-900">Debt Payment Plan</CardTitle>
+                  <CardTitle className="text-xl font-bold text-gray-900">{t("results.debtPlan")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
                     <div className="grid gap-3">
                       <div className="grid grid-cols-1 gap-3">
                         <Input
-                          placeholder="Debt name (e.g., Credit Card)"
+                          placeholder={t("results.debtName")}
                           value={debtForm.name}
                           onChange={(event) => setDebtForm({ ...debtForm, name: event.target.value })}
                           data-testid="input-debt-name"
                         />
                         <Input
-                          placeholder="Total amount"
+                          placeholder={t("results.debtTotal")}
                           value={debtForm.totalAmount}
                           onChange={(event) => setDebtForm({ ...debtForm, totalAmount: event.target.value })}
                           data-testid="input-debt-total"
                         />
                         <Input
-                          placeholder="Monthly payment"
+                          placeholder={t("results.debtMonthly")}
                           value={debtForm.monthlyPayment}
                           onChange={(event) => setDebtForm({ ...debtForm, monthlyPayment: event.target.value })}
                           data-testid="input-debt-monthly"
@@ -766,19 +782,19 @@ export default function Results({ params }: ResultsProps) {
                         className="bg-blue-500 text-white hover:bg-blue-600"
                         data-testid="button-add-debt"
                       >
-                        Add Debt
+                        {t("results.debtAdd")}
                       </Button>
                     </div>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-gray-900">Current Debts</h4>
+                        <h4 className="font-semibold text-gray-900">{t("results.debtList")}</h4>
                         <span className="text-sm text-gray-500">
-                          {debtsLoading ? "Loading..." : `${debts.length} item(s)`}
+                          {debtsLoading ? t("debt.loading") : `${debts.length} item(s)`}
                         </span>
                       </div>
                       {debts.length === 0 ? (
-                        <div className="text-sm text-gray-500">Add your debts to generate a plan.</div>
+                        <div className="text-sm text-gray-500">{t("results.debtEmpty")}</div>
                       ) : (
                         <div className="space-y-2">
                           {debts.map((debt) => (
@@ -809,55 +825,55 @@ export default function Results({ params }: ResultsProps) {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-lg border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Debt-to-Income (DTI)</div>
+                        <div className="text-sm text-gray-600">{t("results.dti")}</div>
                         <div className="text-xl font-semibold text-gray-900">{debtMetrics.dti.toFixed(1)}%</div>
                         <div className="text-xs text-gray-500">{debtMetrics.dtiCategory}</div>
                       </div>
                       <div className="rounded-lg border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Extra Payment Source</div>
+                        <div className="text-sm text-gray-600">{t("results.extraSource")}</div>
                         <div className="text-xl font-semibold text-gray-900">
                           {debtMetrics.extraSource === "none"
-                            ? "Not available"
-                            : `${debtMetrics.extraSource === "wants" ? "Wants" : "Savings"}`}
+                            ? t("results.extraNone")
+                            : `${debtMetrics.extraSource === "wants" ? t("results.extraWants") : t("results.extraSavings")}`}
                         </div>
                         <div className="text-xs text-gray-500">
                           {debtMetrics.extraAmount > 0
-                            ? `$${formatCurrency(debtMetrics.extraAmount)} available per month`
-                            : "No extra funds detected"}
+                            ? t("results.extraAvailable", { amount: `$${formatCurrency(debtMetrics.extraAmount)}` })
+                            : t("results.extraNoneDetail")}
                         </div>
                       </div>
                     </div>
 
                     <div className="rounded-lg border border-gray-200 p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-gray-900">Snowball Plan (Month-by-Month)</h4>
-                        <span className="text-xs text-gray-500">No interest assumed</span>
+                        <h4 className="font-semibold text-gray-900">{t("results.snowball")}</h4>
+                        <span className="text-xs text-gray-500">{t("results.noInterest")}</span>
                       </div>
                       {debtPlan.rows.length === 0 ? (
                         <div className="text-sm text-gray-500">
-                          Add debts and ensure monthly income is set to generate a plan.
+                          {t("results.noPlan")}
                         </div>
                       ) : (
                         <>
                           <div className="text-sm text-gray-600 mb-3">
                             {debtPlan.monthsToHealthy
-                              ? `Estimated months to reach healthy DTI (<= 35%): ${debtPlan.monthsToHealthy}`
-                              : "Healthy DTI is not reached within the projection window."}
+                              ? t("results.monthsHealthy", { months: debtPlan.monthsToHealthy })
+                              : t("results.monthsHealthyNone")}
                           </div>
                           <div className="text-sm text-gray-600 mb-4">
                             {debtPlan.monthsToDebtFree
-                              ? `Estimated months to be debt-free: ${debtPlan.monthsToDebtFree}`
-                              : "Debt-free timeline unavailable."}
+                              ? t("results.monthsDebtFree", { months: debtPlan.monthsToDebtFree })
+                              : t("results.monthsDebtFreeNone")}
                           </div>
                           <div className="overflow-x-auto">
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>Month</TableHead>
-                                  <TableHead>Focus Debt</TableHead>
-                                  <TableHead className="text-right">Total Payment</TableHead>
-                                  <TableHead className="text-right">Extra Applied</TableHead>
-                                  <TableHead className="text-right">Remaining Balance</TableHead>
+                                  <TableHead>{t("results.month")}</TableHead>
+                                  <TableHead>{t("results.focusDebt")}</TableHead>
+                                  <TableHead className="text-right">{t("results.totalPayment")}</TableHead>
+                                  <TableHead className="text-right">{t("results.extraApplied")}</TableHead>
+                                  <TableHead className="text-right">{t("results.remainingBalance")}</TableHead>
                                   <TableHead className="text-right">DTI</TableHead>
                                 </TableRow>
                               </TableHeader>
