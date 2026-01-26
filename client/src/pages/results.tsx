@@ -90,48 +90,6 @@ export default function Results({ params }: ResultsProps) {
 
   const monthlyIncome = parseFloat(analysis?.monthlyIncome ?? "0");
 
-  if (isLoading) {
-    return (
-      <div className="max-w-md mx-auto p-4 pt-8">
-        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
-          <CardContent className="p-8">
-            <div className="text-center mb-8">
-              <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
-              <Skeleton className="h-8 w-48 mx-auto mb-2" />
-              <Skeleton className="h-4 w-64 mx-auto" />
-            </div>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!analysis) {
-    return (
-      <div className="max-w-md mx-auto p-4 pt-8">
-        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
-          <CardContent className="p-8 text-center">
-            <p className="text-gray-600">{t("results.notFound")}</p>
-            <Button onClick={() => setLocation("/upload")} className="mt-4">
-              {t("results.uploadNew")}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const isProcessing = analysis.analysisStatus === "pending";
-  const hasFailed = analysis.analysisStatus === "failed";
-  const actualNeedsPercent = analysis.actualNeeds ? Math.round((parseFloat(analysis.actualNeeds) / monthlyIncome) * 100) : 0;
-  const actualWantsPercent = analysis.actualWants ? Math.round((parseFloat(analysis.actualWants) / monthlyIncome) * 100) : 0;
-  const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
-
   const getCategoryBadge = (category: string) => {
     switch (category) {
       case "50%":
@@ -420,6 +378,48 @@ export default function Results({ params }: ResultsProps) {
         return t("history.statusPending");
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-md mx-auto p-4 pt-8">
+        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+          <CardContent className="p-8">
+            <div className="text-center mb-8">
+              <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
+              <Skeleton className="h-8 w-48 mx-auto mb-2" />
+              <Skeleton className="h-4 w-64 mx-auto" />
+            </div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!analysis) {
+    return (
+      <div className="max-w-md mx-auto p-4 pt-8">
+        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+          <CardContent className="p-8 text-center">
+            <p className="text-gray-600">{t("results.notFound")}</p>
+            <Button onClick={() => setLocation("/upload")} className="mt-4">
+              {t("results.uploadNew")}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const isProcessing = analysis.analysisStatus === "pending";
+  const hasFailed = analysis.analysisStatus === "failed";
+  const actualNeedsPercent = analysis.actualNeeds ? Math.round((parseFloat(analysis.actualNeeds) / monthlyIncome) * 100) : 0;
+  const actualWantsPercent = analysis.actualWants ? Math.round((parseFloat(analysis.actualWants) / monthlyIncome) * 100) : 0;
+  const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
 
   return (
     <div className="max-w-md mx-auto p-4 pt-8">
