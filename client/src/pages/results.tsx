@@ -422,7 +422,7 @@ export default function Results({ params }: ResultsProps) {
   const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
 
   return (
-    <div className="max-w-md mx-auto p-4 pt-8">
+    <div className="w-[70vw] mx-auto p-4 pt-8">
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-results">
         <CardContent className="p-8">
           <div className="text-center mb-8">
