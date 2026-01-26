@@ -190,27 +190,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const analysisId = req.params.id;
-      console.log("Analysis ID: " + analysisId);
-      const analysis = await storage.getBudgetAnalysis(analysisId);
-      console.log("Analysis: " + analysis);
-
-      if (!analysis) {
-        return res.status(404).json({ message: "Analysis not found" });
-      }
-
-      if (analysis.userId !== req.user.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      res.json(analysis);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   app.get("/api/analysis", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
@@ -257,6 +236,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const patterns = await aiService.analyzeHistoryPatterns(rows);
       res.json({ patterns });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const analysisId = req.params.id;
+      console.log("Analysis ID: " + analysisId);
+      const analysis = await storage.getBudgetAnalysis(analysisId);
+      console.log("Analysis: " + analysis);
+
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+
+      if (analysis.userId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(analysis);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

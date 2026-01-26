@@ -30,6 +30,19 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private looksEncrypted(value: string): boolean {
+    return /^[0-9a-f]{32}:[0-9a-f]+$/i.test(value);
+  }
+
+  private decryptString(value: string | null): string | null {
+    if (!value) return value;
+    const decrypted = decrypt(value);
+    if (decrypted === value && this.looksEncrypted(value)) {
+      return null;
+    }
+    return decrypted;
+  }
+
   private serializeExpenses(value: unknown): string | null {
     if (value === undefined || value === null) return null;
     if (typeof value === "string") return value;
@@ -42,13 +55,18 @@ export class DatabaseStorage implements IStorage {
     return encrypt(serialized);
   }
 
-  private decryptExpenses(value: string | null): unknown {
-    if (!value) return value;
-    const decrypted = decrypt(value);
+  private decryptExpenses(value: string | null): unknown[] {
+    if (!value) return [];
+    const decrypted = this.decryptString(value);
+    if (!decrypted) return [];
     try {
-      return JSON.parse(decrypted);
+      const parsed = JSON.parse(decrypted);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return decrypted;
+      if (decrypted === value && this.looksEncrypted(value)) {
+        return [];
+      }
+      return [];
     }
   }
 
@@ -122,7 +140,7 @@ export class DatabaseStorage implements IStorage {
     return {
       ...analysis,
       expenses: this.decryptExpenses(analysis.expenses),
-      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+      recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
     };
   }
 
@@ -133,7 +151,7 @@ export class DatabaseStorage implements IStorage {
     return analyses.map(analysis => ({
       ...analysis,
       expenses: this.decryptExpenses(analysis.expenses),
-      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+      recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
     }));
   }
 
@@ -154,7 +172,7 @@ export class DatabaseStorage implements IStorage {
     return {
       ...analysis,
       expenses: this.decryptExpenses(analysis.expenses),
-      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+      recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
     };
   }
 
@@ -180,7 +198,7 @@ export class DatabaseStorage implements IStorage {
     return {
       ...analysis,
       expenses: this.decryptExpenses(analysis.expenses),
-      recommendations: analysis.recommendations ? decrypt(analysis.recommendations) : analysis.recommendations,
+      recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
     };
   }
 

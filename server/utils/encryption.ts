@@ -48,8 +48,8 @@ export function decrypt(encryptedText: string): string {
     
     return decrypted;
   } catch (error) {
-    console.error('Decryption error:', error);
-    // If decryption fails, data might not be encrypted, return original
+    // If decryption fails, data might not be encrypted or the key changed.
+    // Return original without throwing to avoid breaking requests.
     return encryptedText;
   }
 }
