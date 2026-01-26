@@ -106,7 +106,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 pt-8">
+    <div className="w-[70vw] mx-auto p-4 pt-8">
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-upload">
         <CardContent className="p-8">
           <div className="text-center mb-8">
