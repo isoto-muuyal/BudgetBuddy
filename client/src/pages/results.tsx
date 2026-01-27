@@ -290,15 +290,20 @@ export default function Results({ params }: ResultsProps) {
       .sort((a, b) => a.balance - b.balance);
 
     if (!normalizedDebts.length || !monthlyIncome) {
-      return { rows: [], monthsToHealthy: null, monthsToDebtFree: null };
+      return { months: [], monthsToHealthy: null, monthsToDebtFree: null };
     }
 
-    const rows: Array<{
+    const months: Array<{
       month: number;
-      focusDebt: string;
+      debts: Array<{
+        id: string;
+        name: string;
+        balanceBefore: number;
+        payment: number;
+        remainingAfter: number;
+      }>;
+      totalBalance: number;
       totalPayment: number;
-      extraApplied: number;
-      remainingBalance: number;
       dti: number;
     }> = [];
 
@@ -311,7 +316,15 @@ export default function Results({ params }: ResultsProps) {
     while (month <= maxMonths && normalizedDebts.some((debt) => debt.balance > 0)) {
       normalizedDebts.sort((a, b) => a.balance - b.balance);
       const focusDebt = normalizedDebts.find((debt) => debt.balance > 0);
-      const focusName = focusDebt ? focusDebt.name : "—";
+      const focusId = focusDebt?.id;
+
+      const snapshot = normalizedDebts.map((debt) => ({
+        id: debt.id,
+        name: debt.name,
+        balanceBefore: Math.max(0, debt.balance),
+        payment: 0,
+        remainingAfter: Math.max(0, debt.balance),
+      }));
 
       let totalMinPayment = 0;
 
@@ -320,18 +333,29 @@ export default function Results({ params }: ResultsProps) {
         const minPay = Math.min(debt.monthlyPayment, debt.balance);
         debt.balance -= minPay;
         totalMinPayment += minPay;
+        const row = snapshot.find((entry) => entry.id === debt.id);
+        if (row) {
+          row.payment += minPay;
+          row.remainingAfter = Math.max(0, debt.balance);
+        }
       }
 
       let extraApplied = 0;
       let remainingExtra = rollingExtra;
 
-      for (const debt of normalizedDebts) {
-        if (remainingExtra <= 0) break;
-        if (debt.balance <= 0) continue;
-        const extraPay = Math.min(remainingExtra, debt.balance);
-        debt.balance -= extraPay;
-        extraApplied += extraPay;
-        remainingExtra -= extraPay;
+      if (focusId && remainingExtra > 0) {
+        const focus = normalizedDebts.find((debt) => debt.id === focusId);
+        if (focus && focus.balance > 0) {
+          const extraPay = Math.min(remainingExtra, focus.balance);
+          focus.balance -= extraPay;
+          extraApplied += extraPay;
+          remainingExtra -= extraPay;
+          const row = snapshot.find((entry) => entry.id === focusId);
+          if (row) {
+            row.payment += extraPay;
+            row.remainingAfter = Math.max(0, focus.balance);
+          }
+        }
       }
 
       let newlyFreed = 0;
@@ -345,26 +369,26 @@ export default function Results({ params }: ResultsProps) {
       rollingExtra += newlyFreed;
 
       const remainingBalance = normalizedDebts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0);
-      const dti = monthlyIncome ? (totalMinPayment / monthlyIncome) * 100 : 0;
+      const totalPayment = totalMinPayment + extraApplied;
+      const dti = monthlyIncome ? (totalPayment / monthlyIncome) * 100 : 0;
 
       if (monthsToHealthy === null && dti <= 35) {
         monthsToHealthy = month;
       }
 
-      rows.push({
+      months.push({
         month,
-        focusDebt: focusName,
-        totalPayment: totalMinPayment + extraApplied,
-        extraApplied,
-        remainingBalance,
+        debts: snapshot,
+        totalBalance: remainingBalance,
+        totalPayment,
         dti,
       });
 
       month += 1;
     }
 
-    const monthsToDebtFree = rows.length ? rows[rows.length - 1].month : null;
-    return { rows, monthsToHealthy, monthsToDebtFree };
+    const monthsToDebtFree = months.length ? months[months.length - 1].month : null;
+    return { months, monthsToHealthy, monthsToDebtFree };
   }, [debts, debtMetrics.extraAmount, monthlyIncome]);
 
   const getStatusLabel = (status: string) => {
@@ -867,7 +891,7 @@ export default function Results({ params }: ResultsProps) {
                         <h4 className="font-semibold text-gray-900">{t("results.snowball")}</h4>
                         <span className="text-xs text-gray-500">{t("results.noInterest")}</span>
                       </div>
-                      {debtPlan.rows.length === 0 ? (
+                      {debtPlan.months.length === 0 ? (
                         <div className="text-sm text-gray-500">
                           {t("results.noPlan")}
                         </div>
@@ -887,25 +911,59 @@ export default function Results({ params }: ResultsProps) {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>{t("results.month")}</TableHead>
-                                  <TableHead>{t("results.focusDebt")}</TableHead>
-                                  <TableHead className="text-right">{t("results.totalPayment")}</TableHead>
-                                  <TableHead className="text-right">{t("results.extraApplied")}</TableHead>
-                                  <TableHead className="text-right">{t("results.remainingBalance")}</TableHead>
-                                  <TableHead className="text-right">{t("results.dtiShort")}</TableHead>
+                                  <TableHead>{t("results.debtLabel")}</TableHead>
+                                  {debtPlan.months.slice(0, 4).map((month) => (
+                                    <TableHead key={`month-${month.month}`} colSpan={2} className="text-center">
+                                      {t("results.monthLabel", { month: month.month })}
+                                    </TableHead>
+                                  ))}
+                                </TableRow>
+                                <TableRow>
+                                  <TableHead></TableHead>
+                                  {debtPlan.months.slice(0, 4).flatMap((month) => [
+                                    <TableHead key={`balance-${month.month}`} className="text-right">
+                                      {t("results.debtAmount")}
+                                    </TableHead>,
+                                    <TableHead key={`payment-${month.month}`} className="text-right">
+                                      {t("results.payment")}
+                                    </TableHead>,
+                                  ])}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {debtPlan.rows.slice(0, 12).map((row) => (
-                                  <TableRow key={row.month}>
-                                    <TableCell>{row.month}</TableCell>
-                                    <TableCell>{row.focusDebt}</TableCell>
-                                    <TableCell className="text-right">${formatCurrency(row.totalPayment)}</TableCell>
-                                    <TableCell className="text-right">${formatCurrency(row.extraApplied)}</TableCell>
-                                    <TableCell className="text-right">${formatCurrency(row.remainingBalance)}</TableCell>
-                                    <TableCell className="text-right">{row.dti.toFixed(1)}%</TableCell>
+                                {debts.map((debt) => (
+                                  <TableRow key={debt.id}>
+                                    <TableCell className="font-medium">{debt.name}</TableCell>
+                                    {debtPlan.months.slice(0, 4).flatMap((month) => {
+                                      const debtRow = month.debts.find((item) => item.id === debt.id);
+                                      const balanceBefore = debtRow?.balanceBefore ?? 0;
+                                      const payment = debtRow?.payment ?? 0;
+                                      const balanceLabel =
+                                        balanceBefore <= 0 && payment <= 0
+                                          ? t("results.paid")
+                                          : `$${formatCurrency(balanceBefore)}`;
+                                      return [
+                                        <TableCell key={`balance-${debt.id}-${month.month}`} className="text-right">
+                                          {balanceLabel}
+                                        </TableCell>,
+                                        <TableCell key={`payment-${debt.id}-${month.month}`} className="text-right">
+                                          ${formatCurrency(payment)}
+                                        </TableCell>,
+                                      ];
+                                    })}
                                   </TableRow>
                                 ))}
+                                <TableRow>
+                                  <TableCell className="font-semibold">{t("results.totals")}</TableCell>
+                                  {debtPlan.months.slice(0, 4).flatMap((month) => [
+                                    <TableCell key={`total-balance-${month.month}`} className="text-right font-semibold">
+                                      ${formatCurrency(month.totalBalance)}
+                                    </TableCell>,
+                                    <TableCell key={`total-payment-${month.month}`} className="text-right font-semibold">
+                                      ${formatCurrency(month.totalPayment)}
+                                    </TableCell>,
+                                  ])}
+                                </TableRow>
                               </TableBody>
                             </Table>
                           </div>
