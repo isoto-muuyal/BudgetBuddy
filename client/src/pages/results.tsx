@@ -897,6 +897,11 @@ export default function Results({ params }: ResultsProps) {
                         </div>
                       ) : (
                         <>
+                          {debtPlan.monthsToDebtFree && debtPlan.monthsToDebtFree > 12 && (
+                            <div className="mb-3 text-sm font-semibold text-red-600">
+                              {t("results.debtFreeLong")}
+                            </div>
+                          )}
                           <div className="text-sm text-gray-600 mb-3">
                             {debtPlan.monthsToHealthy
                               ? t("results.monthsHealthy", { months: debtPlan.monthsToHealthy })
@@ -912,29 +917,41 @@ export default function Results({ params }: ResultsProps) {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>{t("results.debtLabel")}</TableHead>
-                                  {debtPlan.months.slice(0, 4).map((month) => (
-                                    <TableHead key={`month-${month.month}`} colSpan={2} className="text-center">
-                                      {t("results.monthLabel", { month: month.month })}
-                                    </TableHead>
-                                  ))}
+                                  {debtPlan.months.slice(0, 12).map((month) => {
+                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
+                                    return (
+                                      <TableHead
+                                        key={`month-${month.month}`}
+                                        colSpan={2}
+                                        className={`text-center ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`}
+                                      >
+                                        {t("results.monthLabel", { month: month.month })}
+                                        {isHealthyMonth ? " *" : ""}
+                                      </TableHead>
+                                    );
+                                  })}
                                 </TableRow>
                                 <TableRow>
                                   <TableHead></TableHead>
-                                  {debtPlan.months.slice(0, 4).flatMap((month) => [
-                                    <TableHead key={`balance-${month.month}`} className="text-right">
-                                      {t("results.debtAmount")}
-                                    </TableHead>,
-                                    <TableHead key={`payment-${month.month}`} className="text-right">
-                                      {t("results.payment")}
-                                    </TableHead>,
-                                  ])}
+                                  {debtPlan.months.slice(0, 12).flatMap((month) => {
+                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
+                                    const cellClass = `text-right ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`;
+                                    return [
+                                      <TableHead key={`balance-${month.month}`} className={cellClass}>
+                                        {t("results.debtAmount")}
+                                      </TableHead>,
+                                      <TableHead key={`payment-${month.month}`} className={cellClass}>
+                                        {t("results.payment")}
+                                      </TableHead>,
+                                    ];
+                                  })}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {debts.map((debt) => (
                                   <TableRow key={debt.id}>
                                     <TableCell className="font-medium">{debt.name}</TableCell>
-                                    {debtPlan.months.slice(0, 4).flatMap((month) => {
+                                    {debtPlan.months.slice(0, 12).flatMap((month) => {
                                       const debtRow = month.debts.find((item) => item.id === debt.id);
                                       const balanceBefore = debtRow?.balanceBefore ?? 0;
                                       const payment = debtRow?.payment ?? 0;
@@ -942,11 +959,13 @@ export default function Results({ params }: ResultsProps) {
                                         balanceBefore <= 0 && payment <= 0
                                           ? t("results.paid")
                                           : `$${formatCurrency(balanceBefore)}`;
+                                      const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
+                                      const cellClass = `text-right ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`;
                                       return [
-                                        <TableCell key={`balance-${debt.id}-${month.month}`} className="text-right">
+                                        <TableCell key={`balance-${debt.id}-${month.month}`} className={cellClass}>
                                           {balanceLabel}
                                         </TableCell>,
-                                        <TableCell key={`payment-${debt.id}-${month.month}`} className="text-right">
+                                        <TableCell key={`payment-${debt.id}-${month.month}`} className={cellClass}>
                                           ${formatCurrency(payment)}
                                         </TableCell>,
                                       ];
@@ -955,14 +974,18 @@ export default function Results({ params }: ResultsProps) {
                                 ))}
                                 <TableRow>
                                   <TableCell className="font-semibold">{t("results.totals")}</TableCell>
-                                  {debtPlan.months.slice(0, 4).flatMap((month) => [
-                                    <TableCell key={`total-balance-${month.month}`} className="text-right font-semibold">
-                                      ${formatCurrency(month.totalBalance)}
-                                    </TableCell>,
-                                    <TableCell key={`total-payment-${month.month}`} className="text-right font-semibold">
-                                      ${formatCurrency(month.totalPayment)}
-                                    </TableCell>,
-                                  ])}
+                                  {debtPlan.months.slice(0, 12).flatMap((month) => {
+                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
+                                    const cellClass = `text-right font-semibold ${isHealthyMonth ? "text-blue-600" : ""}`;
+                                    return [
+                                      <TableCell key={`total-balance-${month.month}`} className={cellClass}>
+                                        ${formatCurrency(month.totalBalance)}
+                                      </TableCell>,
+                                      <TableCell key={`total-payment-${month.month}`} className={cellClass}>
+                                        ${formatCurrency(month.totalPayment)}
+                                      </TableCell>,
+                                    ];
+                                  })}
                                 </TableRow>
                               </TableBody>
                             </Table>
