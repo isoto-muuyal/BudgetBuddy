@@ -571,7 +571,7 @@ export default function Results({ params }: ResultsProps) {
                       {t("results.downloadRecs")}
                     </Button>
                   </div>
-                  <div className="text-sm text-gray-700" data-testid="text-recommendations">
+                  <div className="text-sm text-gray-700 whitespace-pre-line" data-testid="text-recommendations">
                     {analysis.recommendations}
                   </div>
                 </div>
