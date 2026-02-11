@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { generateAndDownloadPDF } from "@/components/ExpenseReportPDF";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -25,6 +26,7 @@ export default function Results({ params }: ResultsProps) {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [debtIncomePercent, setDebtIncomePercent] = useState("10");
   const [debtForm, setDebtForm] = useState({
     name: "",
     totalAmount: "",
@@ -225,20 +227,26 @@ export default function Results({ params }: ResultsProps) {
   };
 
   const debtMetrics = useMemo(() => {
+    const selectedPercent = Number.parseFloat(debtIncomePercent);
+    const normalizedPercent = Number.isFinite(selectedPercent) ? selectedPercent : 0;
+    const totalDebtBudget = monthlyIncome * (normalizedPercent / 100);
+    const debtCount = debts.filter((debt) => parseAmount(debt.totalAmount) > 0).length;
+    const basePayment = debtCount > 0 ? totalDebtBudget / (debtCount + 1) : 0;
+    const smallestDebtPayment = basePayment * 2;
+
     if (!analysis) {
       return {
         totalMonthlyDebtPayments: 0,
         dti: 0,
         dtiCategory: t("results.dtiUnknown"),
-        extraSource: "none",
-        extraAmount: 0,
+        selectedPercent: normalizedPercent,
+        totalDebtBudget,
+        basePayment,
+        smallestDebtPayment,
       };
     }
 
-    const totalMonthlyDebtPayments = debts.reduce(
-      (sum, debt) => sum + parseAmount(debt.monthlyPayment),
-      0
-    );
+    const totalMonthlyDebtPayments = debtCount > 0 ? totalDebtBudget : 0;
     const dti = monthlyIncome ? (totalMonthlyDebtPayments / monthlyIncome) * 100 : 0;
 
     const dtiCategory =
@@ -252,44 +260,37 @@ export default function Results({ params }: ResultsProps) {
               ? t("results.dtiHigh")
               : t("results.dtiDanger");
 
-    const recommendedWants = parseAmount(analysis.recommendedWants);
-    const recommendedSavings = parseAmount(analysis.recommendedSavings);
-    const actualWants = parseAmount(analysis.actualWants);
-    const actualSavings = parseAmount(analysis.actualSavings);
-
-    let extraSource: "wants" | "savings" | "none" = "none";
-    let extraAmount = 0;
-
-    if (actualWants > recommendedWants) {
-      extraSource = "wants";
-      extraAmount = actualWants - recommendedWants;
-    } else if (actualSavings > recommendedSavings) {
-      extraSource = "savings";
-      extraAmount = actualSavings - recommendedSavings;
-    }
-
     return {
       totalMonthlyDebtPayments,
       dti,
       dtiCategory,
-      extraSource,
-      extraAmount,
+      selectedPercent: normalizedPercent,
+      totalDebtBudget,
+      basePayment,
+      smallestDebtPayment,
     };
-  }, [analysis, debts, monthlyIncome, t]);
+  }, [analysis, debtIncomePercent, debts, monthlyIncome, t]);
 
   const debtPlan = useMemo(() => {
+    const selectedPercent = Number.parseFloat(debtIncomePercent);
+    const normalizedPercent = Number.isFinite(selectedPercent) ? selectedPercent : 0;
+    const totalDebtBudget = monthlyIncome * (normalizedPercent / 100);
+
     const normalizedDebts = debts
       .map((debt) => ({
         id: debt.id,
         name: debt.name,
         balance: parseAmount(debt.totalAmount),
-        monthlyPayment: parseAmount(debt.monthlyPayment),
-        paidOff: false,
       }))
-      .filter((debt) => debt.balance > 0 && debt.monthlyPayment > 0)
+      .filter((debt) => debt.balance > 0)
       .sort((a, b) => a.balance - b.balance);
 
     if (!normalizedDebts.length || !monthlyIncome) {
+      return { months: [], monthsToHealthy: null, monthsToDebtFree: null };
+    }
+
+    const basePayment = totalDebtBudget / (normalizedDebts.length + 1);
+    if (!basePayment) {
       return { months: [], monthsToHealthy: null, monthsToDebtFree: null };
     }
 
@@ -307,7 +308,6 @@ export default function Results({ params }: ResultsProps) {
       dti: number;
     }> = [];
 
-    let rollingExtra = Math.max(0, debtMetrics.extraAmount);
     let month = 1;
     let monthsToHealthy: number | null = null;
 
@@ -326,50 +326,22 @@ export default function Results({ params }: ResultsProps) {
         remainingAfter: Math.max(0, debt.balance),
       }));
 
-      let totalMinPayment = 0;
-
       for (const debt of normalizedDebts) {
         if (debt.balance <= 0) continue;
-        const minPay = Math.min(debt.monthlyPayment, debt.balance);
-        debt.balance -= minPay;
-        totalMinPayment += minPay;
+
+        const targetPayment = debt.id === focusId ? basePayment * 2 : basePayment;
+        const payment = Math.min(targetPayment, debt.balance);
+        debt.balance -= payment;
+
         const row = snapshot.find((entry) => entry.id === debt.id);
         if (row) {
-          row.payment += minPay;
+          row.payment += payment;
           row.remainingAfter = Math.max(0, debt.balance);
         }
       }
 
-      let extraApplied = 0;
-      let remainingExtra = rollingExtra;
-
-      if (focusId && remainingExtra > 0) {
-        const focus = normalizedDebts.find((debt) => debt.id === focusId);
-        if (focus && focus.balance > 0) {
-          const extraPay = Math.min(remainingExtra, focus.balance);
-          focus.balance -= extraPay;
-          extraApplied += extraPay;
-          remainingExtra -= extraPay;
-          const row = snapshot.find((entry) => entry.id === focusId);
-          if (row) {
-            row.payment += extraPay;
-            row.remainingAfter = Math.max(0, focus.balance);
-          }
-        }
-      }
-
-      let newlyFreed = 0;
-      for (const debt of normalizedDebts) {
-        if (debt.balance <= 0 && !debt.paidOff) {
-          debt.paidOff = true;
-          newlyFreed += debt.monthlyPayment;
-        }
-      }
-
-      rollingExtra += newlyFreed;
-
       const remainingBalance = normalizedDebts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0);
-      const totalPayment = totalMinPayment + extraApplied;
+      const totalPayment = snapshot.reduce((sum, debt) => sum + debt.payment, 0);
       const dti = monthlyIncome ? (totalPayment / monthlyIncome) * 100 : 0;
 
       if (monthsToHealthy === null && dti <= 35) {
@@ -389,7 +361,7 @@ export default function Results({ params }: ResultsProps) {
 
     const monthsToDebtFree = months.length ? months[months.length - 1].month : null;
     return { months, monthsToHealthy, monthsToDebtFree };
-  }, [debts, debtMetrics.extraAmount, monthlyIncome]);
+  }, [debtIncomePercent, debts, monthlyIncome]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -793,11 +765,25 @@ export default function Results({ params }: ResultsProps) {
                   <CardTitle className="text-xl font-bold text-gray-900">{t("results.debtPlan")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    <div className="grid gap-3">
-                      <div className="grid grid-cols-1 gap-3">
-                        <Input
-                          placeholder={t("results.debtName")}
+                    <div className="space-y-6">
+                      <div className="grid gap-3">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-2">Debt payment % of monthly income</div>
+                          <Select value={debtIncomePercent} onValueChange={setDebtIncomePercent}>
+                            <SelectTrigger data-testid="select-debt-income-percent">
+                              <SelectValue placeholder="Select debt payment %" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5%</SelectItem>
+                              <SelectItem value="10">10%</SelectItem>
+                              <SelectItem value="15">15%</SelectItem>
+                              <SelectItem value="20">20%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          <Input
+                            placeholder={t("results.debtName")}
                           value={debtForm.name}
                           onChange={(event) => setDebtForm({ ...debtForm, name: event.target.value })}
                           data-testid="input-debt-name"
@@ -872,16 +858,12 @@ export default function Results({ params }: ResultsProps) {
                         <div className="text-xs text-gray-500">{debtMetrics.dtiCategory}</div>
                       </div>
                       <div className="rounded-lg border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">{t("results.extraSource")}</div>
+                        <div className="text-sm text-gray-600">Projected debt budget</div>
                         <div className="text-xl font-semibold text-gray-900">
-                          {debtMetrics.extraSource === "none"
-                            ? t("results.extraNone")
-                            : `${debtMetrics.extraSource === "wants" ? t("results.extraWants") : t("results.extraSavings")}`}
+                          ${formatCurrency(debtMetrics.totalDebtBudget)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {debtMetrics.extraAmount > 0
-                            ? t("results.extraAvailable", { amount: `$${formatCurrency(debtMetrics.extraAmount)}` })
-                            : t("results.extraNoneDetail")}
+                          Base payment: ${formatCurrency(debtMetrics.basePayment)} | Smallest debt: ${formatCurrency(debtMetrics.smallestDebtPayment)}
                         </div>
                       </div>
                     </div>
