@@ -32,15 +32,40 @@ export const db = drizzle(pool, { schema });
 const execFileAsync = promisify(execFile);
 
 export async function ensureDatabaseSchema(): Promise<void> {
+  const ensureAppVersionsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_versions (
+        id SERIAL PRIMARY KEY,
+        version text NOT NULL,
+        updated_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+
+    await pool.query(`
+      INSERT INTO app_versions (version, updated_at)
+      SELECT '0.1.1', now()
+      WHERE NOT EXISTS (SELECT 1 FROM app_versions)
+    `);
+  };
+
   const shouldAutoPush = process.env.AUTO_DB_PUSH !== "false";
   if (!shouldAutoPush) {
+    await ensureAppVersionsTable();
     return;
   }
 
   try {
-    const result = await pool.query("SELECT to_regclass('public.users') AS users");
+    const result = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.app_versions') AS app_versions");
     const hasUsersTable = result.rows?.[0]?.users;
-    if (hasUsersTable) {
+    const hasAppVersionsTable = result.rows?.[0]?.app_versions;
+    if (hasUsersTable && hasAppVersionsTable) {
+      await ensureAppVersionsTable();
+      return;
+    }
+
+    if (hasUsersTable && !hasAppVersionsTable) {
+      await ensureAppVersionsTable();
+      console.log("app_versions table created successfully.");
       return;
     }
 
@@ -48,9 +73,13 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await execFileAsync("node", ["./node_modules/.bin/drizzle-kit", "push", "--config", "drizzle.config.ts"], {
       env: process.env,
     });
-    const verify = await pool.query("SELECT to_regclass('public.users') AS users");
+    const verify = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.app_versions') AS app_versions");
     const verified = verify.rows?.[0]?.users;
+    const verifiedVersions = verify.rows?.[0]?.app_versions;
     if (verified) {
+      if (!verifiedVersions) {
+        await ensureAppVersionsTable();
+      }
       console.log("Database schema created successfully.");
       return;
     }
@@ -101,6 +130,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         created_at timestamp DEFAULT now()
       )
     `);
+    await ensureAppVersionsTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);

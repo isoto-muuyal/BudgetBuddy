@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { users, budgetAnalyses, debts, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt } from "@shared/schema";
+import { users, budgetAnalyses, debts, appVersions, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt, type AppVersion } from "@shared/schema";
 import { db } from "./db";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export interface IStorage {
@@ -27,6 +27,10 @@ export interface IStorage {
   getDebtsByUser(userId: string): Promise<Debt[]>;
   createDebt(userId: string, debt: InsertDebt): Promise<Debt>;
   deleteDebt(userId: string, debtId: string): Promise<void>;
+
+  // App version methods
+  getLatestAppVersion(): Promise<AppVersion>;
+  bumpAppVersion(): Promise<AppVersion>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -222,6 +226,59 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(debts)
       .where(and(eq(debts.id, debtId), eq(debts.userId, userId)));
+  }
+
+  private getNextPatchVersion(version: string): string {
+    const parts = version.split(".");
+    if (parts.length !== 3) {
+      return "0.1.1";
+    }
+
+    const [major, minor, patch] = parts.map((part) => Number(part));
+    if ([major, minor, patch].some((part) => Number.isNaN(part) || part < 0)) {
+      return "0.1.1";
+    }
+
+    return `${major}.${minor}.${patch + 1}`;
+  }
+
+  async getLatestAppVersion(): Promise<AppVersion> {
+    const [versionRow] = await db
+      .select()
+      .from(appVersions)
+      .orderBy(desc(appVersions.id))
+      .limit(1);
+
+    if (versionRow) {
+      return versionRow;
+    }
+
+    const [seededVersion] = await db
+      .insert(appVersions)
+      .values({ version: "0.1.1" })
+      .returning();
+
+    if (!seededVersion) {
+      throw new Error("Failed to initialize app version");
+    }
+
+    return seededVersion;
+  }
+
+  async bumpAppVersion(): Promise<AppVersion> {
+    const current = await this.getLatestAppVersion();
+    const nextVersion = this.getNextPatchVersion(current.version);
+
+    const [updatedVersion] = await db
+      .insert(appVersions)
+      .values({ version: nextVersion })
+      .returning();
+
+    if (!updatedVersion) {
+      throw new Error("Failed to bump app version");
+    }
+
+    return updatedVersion;
   }
 }
 

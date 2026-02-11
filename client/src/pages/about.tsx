@@ -1,9 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Shield, Zap, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
+
+type AppVersionResponse = {
+  id: number;
+  version: string;
+  updatedAt: string;
+};
 
 export default function About() {
   const { t } = useTranslation();
+  const { data: appVersion, isLoading: versionLoading } = useQuery<AppVersionResponse>({
+    queryKey: ["/api/version"],
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  const versionLabel = appVersion?.version ?? "0.1.1";
+  const updatedLabel = appVersion?.updatedAt
+    ? new Date(appVersion.updatedAt).toLocaleString()
+    : "Not available";
 
   return (
     <div className="max-w-4xl mx-auto p-6 pt-8">
@@ -15,6 +32,20 @@ export default function About() {
           {t("about.subtitle")}
         </p>
       </div>
+
+      <Card className="bg-white rounded-2xl shadow-lg border border-gray-100 mb-8">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-gray-900">Build Version</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-gray-800">
+            <span className="font-semibold">Current version:</span> {versionLoading ? "Loading..." : versionLabel}
+          </p>
+          <p className="text-gray-800">
+            <span className="font-semibold">Last updated:</span> {versionLoading ? "Loading..." : updatedLabel}
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-8 mb-12">
         <Card className="bg-white rounded-2xl shadow-lg border border-gray-100">

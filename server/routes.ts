@@ -61,6 +61,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  app.use("/api", async (req, _res, next) => {
+    try {
+      await storage.bumpAppVersion();
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/version", async (_req, res) => {
+    try {
+      const version = await storage.getLatestAppVersion();
+      res.json(version);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/signup", async (req, res) => {
     try {

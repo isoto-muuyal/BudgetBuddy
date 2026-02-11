@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, jsonb, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -42,6 +42,12 @@ export const debts = pgTable("debts", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   monthlyPayment: decimal("monthly_payment", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const appVersions = pgTable("app_versions", {
+  id: serial("id").primaryKey(),
+  version: text("version").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -104,3 +110,4 @@ export type Debt = typeof debts.$inferSelect;
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type AppVersion = typeof appVersions.$inferSelect;
