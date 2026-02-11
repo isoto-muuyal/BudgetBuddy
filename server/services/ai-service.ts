@@ -659,6 +659,3 @@ Keep the response concise and actionable with bullet points.
 }
 
 export const aiService = new AIService();
-
-export const aiService = new AIService();
-export const aiService = new AIService();
