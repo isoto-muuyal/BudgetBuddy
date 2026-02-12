@@ -63,7 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api", async (req, _res, next) => {
     try {
-      await storage.bumpAppVersion();
+      const isVersionRead = req.method === "GET" && req.path === "/version";
+      if (!isVersionRead) {
+        await storage.bumpAppVersion();
+      }
       next();
     } catch (error) {
       next(error);
