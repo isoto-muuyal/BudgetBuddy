@@ -105,6 +105,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const button = typeof req.body?.button === "string" ? req.body.button : "";
       const section = typeof req.body?.section === "string" ? req.body.section : "";
 
+      if (page.startsWith("/admin")) {
+        return res.json({ message: "Admin visits are ignored" });
+      }
+
       await adminService.trackVisit({
         timestamp: new Date().toISOString(),
         page,

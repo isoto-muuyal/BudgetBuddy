@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 
 function sendVisit(payload: { page: string; button?: string; section?: string }) {
+  if (payload.page.startsWith("/admin")) {
+    return;
+  }
+
   const body = JSON.stringify(payload);
 
   if (navigator.sendBeacon) {
@@ -26,7 +30,9 @@ export default function VisitTracker() {
   useEffect(() => {
     if (lastPageRef.current !== location) {
       lastPageRef.current = location;
-      sendVisit({ page: location, section: "page-enter" });
+      if (!location.startsWith("/admin")) {
+        sendVisit({ page: location, section: "page-enter" });
+      }
     }
   }, [location]);
 
@@ -36,6 +42,10 @@ export default function VisitTracker() {
       const clickable = target?.closest("button, a, [role='button']");
 
       if (!clickable) {
+        return;
+      }
+
+      if (window.location.pathname.startsWith("/admin")) {
         return;
       }
 
