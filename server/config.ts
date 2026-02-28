@@ -27,6 +27,9 @@ export const config = {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
+  admin: {
+    visitsCsvPath: process.env.ADMIN_VISITS_CSV_PATH || "./data/visits.csv",
+  },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",

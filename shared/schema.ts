@@ -50,6 +50,12 @@ export const appVersions = pgTable("app_versions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const admins = pgTable("ADMIN", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   emailVerified: true,
@@ -111,3 +117,4 @@ export type InsertDebt = z.infer<typeof insertDebtSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;
+export type Admin = typeof admins.$inferSelect;

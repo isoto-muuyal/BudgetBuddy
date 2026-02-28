@@ -20,12 +20,15 @@ import NotFound from "@/pages/not-found";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import History from "@/pages/history";
+import AdminPage from "@/pages/admin";
+import VisitTracker from "@/components/visit-tracker";
 
 
 function Router() {
   return (
     <div className="min-h-screen">
       <Navigation />
+      <VisitTracker />
       <Switch>
         <Route path="/" component={Login} />
         <Route path="/login" component={Login} />
@@ -41,6 +44,7 @@ function Router() {
         <Route path="/about" component={About} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />
+        <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
       <LoadingOverlay />

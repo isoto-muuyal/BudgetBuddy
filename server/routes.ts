@@ -5,9 +5,11 @@ import multer from "multer";
 import path from "path";
 import { storage } from "./storage";
 import { authService } from "./services/auth";
+import { adminService } from "./services/admin";
 import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
+import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
 import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
@@ -77,6 +79,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const version = await storage.getLatestAppVersion();
       res.json(version);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const username = typeof req.body?.username === "string" ? req.body.username : "";
+      const password = typeof req.body?.password === "string" ? req.body.password : "";
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const result = await adminService.login(username, password);
+      res.json(result);
+    } catch (error: any) {
+      res.status(401).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/visits/track", async (req, res) => {
+    try {
+      const page = typeof req.body?.page === "string" ? req.body.page : "unknown";
+      const button = typeof req.body?.button === "string" ? req.body.button : "";
+      const section = typeof req.body?.section === "string" ? req.body.section : "";
+
+      await adminService.trackVisit({
+        timestamp: new Date().toISOString(),
+        page,
+        button,
+        section,
+        location: adminService.getVisitorLocation(req.headers as Record<string, unknown>),
+        ipAddress: adminService.getClientIp(req.headers as Record<string, unknown>, req.ip),
+      });
+
+      res.json({ message: "Visit tracked" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+    try {
+      const visits = await adminService.getVisits();
+      res.json(visits);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

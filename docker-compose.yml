@@ -10,6 +10,9 @@ services:
       - PORT=5003
       # Note: We use the container name 'postgres_db' because they share a network
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@postgres_db:5432/${DB_NAME}
+      - ADMIN_VISITS_CSV_PATH=/app/data/visits.csv
+    volumes:
+      - ./data:/app/data
     networks:
       - shared_network
 

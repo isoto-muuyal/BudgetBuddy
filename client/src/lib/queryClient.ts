@@ -12,12 +12,24 @@ export const getAuthToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
+export const getAdminToken = (): string | null => {
+  return localStorage.getItem("admin_auth_token");
+};
+
 export const setAuthToken = (token: string): void => {
   localStorage.setItem('auth_token', token);
 };
 
+export const setAdminToken = (token: string): void => {
+  localStorage.setItem("admin_auth_token", token);
+};
+
 export const removeAuthToken = (): void => {
   localStorage.removeItem('auth_token');
+};
+
+export const removeAdminToken = (): void => {
+  localStorage.removeItem("admin_auth_token");
 };
 
 export async function apiRequest(

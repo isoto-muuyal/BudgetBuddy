@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import bcrypt from "bcrypt";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
@@ -48,24 +49,41 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensureAdminTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ADMIN" (
+        id SERIAL PRIMARY KEY,
+        username text NOT NULL UNIQUE,
+        password text NOT NULL
+      )
+    `);
+  };
+
   const shouldAutoPush = process.env.AUTO_DB_PUSH !== "false";
   if (!shouldAutoPush) {
     await ensureAppVersionsTable();
+    await ensureAdminTable();
     return;
   }
 
   try {
-    const result = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.app_versions') AS app_versions");
+    const result = await pool.query(`SELECT
+      to_regclass('public.users') AS users,
+      to_regclass('public.app_versions') AS app_versions,
+      to_regclass('public."ADMIN"') AS admins`);
     const hasUsersTable = result.rows?.[0]?.users;
     const hasAppVersionsTable = result.rows?.[0]?.app_versions;
-    if (hasUsersTable && hasAppVersionsTable) {
+    const hasAdminTable = result.rows?.[0]?.admins;
+    if (hasUsersTable && hasAppVersionsTable && hasAdminTable) {
       await ensureAppVersionsTable();
+      await ensureAdminTable();
       return;
     }
 
-    if (hasUsersTable && !hasAppVersionsTable) {
+    if (hasUsersTable) {
       await ensureAppVersionsTable();
-      console.log("app_versions table created successfully.");
+      await ensureAdminTable();
+      console.log("app_versions and ADMIN tables ensured successfully.");
       return;
     }
 
@@ -73,12 +91,19 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await execFileAsync("node", ["./node_modules/.bin/drizzle-kit", "push", "--config", "drizzle.config.ts"], {
       env: process.env,
     });
-    const verify = await pool.query("SELECT to_regclass('public.users') AS users, to_regclass('public.app_versions') AS app_versions");
+    const verify = await pool.query(`SELECT
+      to_regclass('public.users') AS users,
+      to_regclass('public.app_versions') AS app_versions,
+      to_regclass('public."ADMIN"') AS admins`);
     const verified = verify.rows?.[0]?.users;
     const verifiedVersions = verify.rows?.[0]?.app_versions;
+    const verifiedAdmins = verify.rows?.[0]?.admins;
     if (verified) {
       if (!verifiedVersions) {
         await ensureAppVersionsTable();
+      }
+      if (!verifiedAdmins) {
+        await ensureAdminTable();
       }
       console.log("Database schema created successfully.");
       return;
@@ -131,6 +156,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       )
     `);
     await ensureAppVersionsTable();
+    await ensureAdminTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);
@@ -174,6 +200,36 @@ export async function ensureSeedUser(): Promise<void> {
     console.log(`Seed user created for ${email}`);
   } catch (error) {
     console.error("Failed to seed user:", error);
+    throw error;
+  }
+}
+
+export async function ensureSeedAdmin(): Promise<void> {
+  const username = process.env.SEED_ADMIN_USERNAME || "israel.soto";
+  const password = process.env.SEED_ADMIN_PASSWORD || "shitokai23";
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ADMIN" (
+        id SERIAL PRIMARY KEY,
+        username text NOT NULL UNIQUE,
+        password text NOT NULL
+      )
+    `);
+
+    const existing = await pool.query('SELECT id FROM "ADMIN" WHERE username = $1 LIMIT 1', [username]);
+    if (existing.rowCount && existing.rows[0]) {
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await pool.query(
+      'INSERT INTO "ADMIN" (username, password) VALUES ($1, $2)',
+      [username, passwordHash]
+    );
+    console.log(`Seed admin created for ${username}`);
+  } catch (error) {
+    console.error("Failed to seed admin:", error);
     throw error;
   }
 }

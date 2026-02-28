@@ -3,7 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./vite-helpers";
-import { ensureDatabaseSchema, ensureSeedUser } from "./db";
+import { ensureDatabaseSchema, ensureSeedAdmin, ensureSeedUser } from "./db";
 
 const app = express();
 
@@ -54,6 +54,7 @@ const isDev = process.env.NODE_ENV === "development";
 (async () => {
   await ensureDatabaseSchema();
   await ensureSeedUser();
+  await ensureSeedAdmin();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { users, budgetAnalyses, debts, appVersions, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt, type AppVersion } from "@shared/schema";
+import { users, budgetAnalyses, debts, appVersions, admins, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt, type AppVersion, type Admin } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
@@ -31,6 +31,9 @@ export interface IStorage {
   // App version methods
   getLatestAppVersion(): Promise<AppVersion>;
   bumpAppVersion(): Promise<AppVersion>;
+
+  // Admin methods
+  getAdminByUsername(username: string): Promise<Admin | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -279,6 +282,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     return updatedVersion;
+  }
+
+  async getAdminByUsername(username: string): Promise<Admin | undefined> {
+    const [admin] = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.username, username));
+
+    return admin || undefined;
   }
 }
 
