@@ -12,6 +12,7 @@ export type VisitLogEntry = {
   section: string;
   location: string;
   ipAddress: string;
+  userIdentifier: string;
 };
 
 export class AdminService {
@@ -23,7 +24,7 @@ export class AdminService {
     try {
       await fs.access(this.csvPath);
     } catch {
-      await fs.writeFile(this.csvPath, "timestamp,page,button,section,location,ip_address\n", "utf8");
+      await fs.writeFile(this.csvPath, "timestamp,page,button,section,location,ip_address,user_identifier\n", "utf8");
     }
   }
 
@@ -121,6 +122,7 @@ export class AdminService {
       this.escapeCsv(entry.section),
       this.escapeCsv(entry.location),
       this.escapeCsv(entry.ipAddress),
+      this.escapeCsv(entry.userIdentifier),
     ].join(",") + "\n";
 
     await fs.appendFile(this.csvPath, row, "utf8");
@@ -132,8 +134,8 @@ export class AdminService {
     const lines = content.split(/\r?\n/).filter(Boolean);
 
     return lines.slice(1).map((line) => {
-      const [timestamp = "", page = "", button = "", section = "", location = "", ipAddress = ""] = this.parseCsvLine(line);
-      return { timestamp, page, button, section, location, ipAddress };
+      const [timestamp = "", page = "", button = "", section = "", location = "", ipAddress = "", userIdentifier = ""] = this.parseCsvLine(line);
+      return { timestamp, page, button, section, location, ipAddress, userIdentifier };
     }).reverse();
   }
 }

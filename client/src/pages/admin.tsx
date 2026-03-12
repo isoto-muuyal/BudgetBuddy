@@ -13,6 +13,12 @@ type VisitRow = {
   section: string;
   location: string;
   ipAddress: string;
+  userIdentifier: string;
+};
+
+type RankedItem = {
+  name: string;
+  count: number;
 };
 
 export default function AdminPage() {
@@ -66,6 +72,23 @@ export default function AdminPage() {
   });
 
   const rows = useMemo(() => visitsQuery.data ?? [], [visitsQuery.data]);
+  const stats = useMemo(() => {
+    const rankTop = (values: string[]): RankedItem[] =>
+      Object.entries(values.reduce<Record<string, number>>((acc, value) => {
+        if (!value) return acc;
+        acc[value] = (acc[value] || 0) + 1;
+        return acc;
+      }, {}))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, count }));
+
+    const topPages = rankTop(rows.map((row) => row.page));
+    const topButtons = rankTop(rows.map((row) => row.button));
+    const uniqueUsers = new Set(rows.map((row) => row.userIdentifier).filter(Boolean)).size;
+
+    return { topPages, topButtons, uniqueUsers };
+  }, [rows]);
 
   if (!isAuthenticated) {
     return (
@@ -102,6 +125,51 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 pt-8">
+      <div className="grid gap-6 mb-6 lg:grid-cols-3">
+        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+          <CardHeader>
+            <CardTitle>Unique Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-gray-900">{stats.uniqueUsers}</div>
+            <div className="text-sm text-gray-500">Distinct logged-in users captured in visit events</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Statistics</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="font-semibold text-gray-900 mb-3">Top 10 Most Visited Pages</div>
+              <div className="space-y-2">
+                {stats.topPages.length ? stats.topPages.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    <span className="truncate pr-4">{item.name}</span>
+                    <span className="font-semibold">{item.count}</span>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No page visits yet.</div>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="font-semibold text-gray-900 mb-3">Top 10 Most Clicked Buttons</div>
+              <div className="space-y-2">
+                {stats.topButtons.length ? stats.topButtons.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                    <span className="truncate pr-4">{item.name}</span>
+                    <span className="font-semibold">{item.count}</span>
+                  </div>
+                )) : (
+                  <div className="text-sm text-gray-500">No button clicks yet.</div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Visit Logs</CardTitle>
@@ -126,6 +194,7 @@ export default function AdminPage() {
                   <TableHead>Section</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>IP Address</TableHead>
+                  <TableHead>User</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -137,11 +206,12 @@ export default function AdminPage() {
                     <TableCell>{row.section || "-"}</TableCell>
                     <TableCell>{row.location || "-"}</TableCell>
                     <TableCell>{row.ipAddress || "-"}</TableCell>
+                    <TableCell>{row.userIdentifier || "-"}</TableCell>
                   </TableRow>
                 ))}
                 {rows.length === 0 && !visitsQuery.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500">
+                    <TableCell colSpan={7} className="text-center text-gray-500">
                       No visit data yet.
                     </TableCell>
                   </TableRow>

@@ -116,6 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         section,
         location: adminService.getVisitorLocation(req.headers as Record<string, unknown>),
         ipAddress: adminService.getClientIp(req.headers as Record<string, unknown>, req.ip),
+        userIdentifier: typeof req.body?.userIdentifier === "string" ? req.body.userIdentifier : "",
       });
 
       res.json({ message: "Visit tracked" });

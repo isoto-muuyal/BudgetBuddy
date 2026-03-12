@@ -868,112 +868,109 @@ export default function Results({ params }: ResultsProps) {
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-gray-900">{t("results.snowball")}</h4>
-                        <span className="text-xs text-gray-500">{t("results.noInterest")}</span>
-                      </div>
-                      {debtPlan.months.length === 0 ? (
-                        <div className="text-sm text-gray-500">
-                          {t("results.noPlan")}
+                    <div className="rounded-lg border-4 border-cyan-500 bg-cyan-50 p-3 sm:p-4">
+                      <div className="rounded-md border-2 border-cyan-500 bg-white p-4">
+                        <div className="text-center">
+                          <div
+                            className="text-4xl leading-none text-gray-900 sm:text-5xl"
+                            style={{ fontFamily: "'Architects Daughter', cursive" }}
+                          >
+                            Free Printable
+                          </div>
+                          <h4 className="mt-3 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
+                            Debt Snowball Worksheet
+                          </h4>
+                          <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            {t("results.noInterest")}
+                          </p>
                         </div>
-                      ) : (
-                        <>
-                          {debtPlan.monthsToDebtFree && debtPlan.monthsToDebtFree > 12 && (
-                            <div className="mb-3 text-sm font-semibold text-red-600">
-                              {t("results.debtFreeLong")}
+
+                        {debtPlan.months.length === 0 ? (
+                          <div className="mt-4 text-sm text-gray-500">
+                            {t("results.noPlan")}
+                          </div>
+                        ) : (
+                          <>
+                            {debtPlan.monthsToDebtFree && debtPlan.monthsToDebtFree > 12 && (
+                              <div className="mt-4 text-sm font-semibold text-red-600">
+                                {t("results.debtFreeLong")}
+                              </div>
+                            )}
+                            <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                              <div>
+                                {debtPlan.monthsToHealthy
+                                  ? t("results.monthsHealthy", { months: debtPlan.monthsToHealthy })
+                                  : t("results.monthsHealthyNone")}
+                              </div>
+                              <div>
+                                {debtPlan.monthsToDebtFree
+                                  ? t("results.monthsDebtFree", { months: debtPlan.monthsToDebtFree })
+                                  : t("results.monthsDebtFreeNone")}
+                              </div>
                             </div>
-                          )}
-                          <div className="text-sm text-gray-600 mb-3">
-                            {debtPlan.monthsToHealthy
-                              ? t("results.monthsHealthy", { months: debtPlan.monthsToHealthy })
-                              : t("results.monthsHealthyNone")}
-                          </div>
-                          <div className="text-sm text-gray-600 mb-4">
-                            {debtPlan.monthsToDebtFree
-                              ? t("results.monthsDebtFree", { months: debtPlan.monthsToDebtFree })
-                              : t("results.monthsDebtFreeNone")}
-                          </div>
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>{t("results.debtLabel")}</TableHead>
-                                  {debtPlan.months.slice(0, 12).map((month) => {
-                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
-                                    return (
+
+                            <div className="mt-4 overflow-x-auto rounded border border-cyan-500">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="border-b border-cyan-600 bg-white hover:bg-white">
+                                    <TableHead className="min-w-[180px] border-r border-cyan-600 text-left font-bold text-gray-800">
+                                      {t("results.debtLabel")}
+                                    </TableHead>
+                                    {debtPlan.months.slice(0, 6).map((month) => (
                                       <TableHead
                                         key={`month-${month.month}`}
-                                        colSpan={2}
-                                        className={`text-center ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`}
+                                        className="min-w-[130px] border-r border-cyan-600 text-center font-bold text-gray-800 last:border-r-0"
                                       >
                                         {t("results.monthLabel", { month: month.month })}
-                                        {isHealthyMonth ? " *" : ""}
                                       </TableHead>
-                                    );
-                                  })}
-                                </TableRow>
-                                <TableRow>
-                                  <TableHead></TableHead>
-                                  {debtPlan.months.slice(0, 12).flatMap((month) => {
-                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
-                                    const cellClass = `text-right ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`;
-                                    return [
-                                      <TableHead key={`balance-${month.month}`} className={cellClass}>
-                                        {t("results.debtAmount")}
-                                      </TableHead>,
-                                      <TableHead key={`payment-${month.month}`} className={cellClass}>
-                                        {t("results.payment")}
-                                      </TableHead>,
-                                    ];
-                                  })}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {debts.map((debt) => (
-                                  <TableRow key={debt.id}>
-                                    <TableCell className="font-medium">{debt.name}</TableCell>
-                                    {debtPlan.months.slice(0, 12).flatMap((month) => {
-                                      const debtRow = month.debts.find((item) => item.id === debt.id);
-                                      const balanceBefore = debtRow?.balanceBefore ?? 0;
-                                      const payment = debtRow?.payment ?? 0;
-                                      const balanceLabel =
-                                        balanceBefore <= 0 && payment <= 0
-                                          ? t("results.paid")
-                                          : `$${formatCurrency(balanceBefore)}`;
-                                      const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
-                                      const cellClass = `text-right ${isHealthyMonth ? "text-blue-600 font-semibold" : ""}`;
-                                      return [
-                                        <TableCell key={`balance-${debt.id}-${month.month}`} className={cellClass}>
-                                          {balanceLabel}
-                                        </TableCell>,
-                                        <TableCell key={`payment-${debt.id}-${month.month}`} className={cellClass}>
-                                          ${formatCurrency(payment)}
-                                        </TableCell>,
-                                      ];
-                                    })}
+                                    ))}
                                   </TableRow>
-                                ))}
-                                <TableRow>
-                                  <TableCell className="font-semibold">{t("results.totals")}</TableCell>
-                                  {debtPlan.months.slice(0, 12).flatMap((month) => {
-                                    const isHealthyMonth = debtPlan.monthsToHealthy === month.month;
-                                    const cellClass = `text-right font-semibold ${isHealthyMonth ? "text-blue-600" : ""}`;
-                                    return [
-                                      <TableCell key={`total-balance-${month.month}`} className={cellClass}>
+                                </TableHeader>
+                                <TableBody>
+                                  {debts.map((debt, rowIndex) => (
+                                    <TableRow
+                                      key={debt.id}
+                                      className={rowIndex % 2 === 0 ? "bg-cyan-200/80 hover:bg-cyan-200/80" : "bg-white hover:bg-white"}
+                                    >
+                                      <TableCell className="border-r border-cyan-600 font-semibold text-gray-900">
+                                        {debt.name}
+                                      </TableCell>
+                                      {debtPlan.months.slice(0, 6).map((month) => {
+                                        const debtRow = month.debts.find((item) => item.id === debt.id);
+                                        const balanceBefore = debtRow?.balanceBefore ?? 0;
+                                        const payment = debtRow?.payment ?? 0;
+                                        const remainingAfter = Math.max(0, balanceBefore - payment);
+                                        const value = remainingAfter <= 0 ? t("results.paid") : `$${formatCurrency(remainingAfter)}`;
+                                        return (
+                                          <TableCell
+                                            key={`${debt.id}-${month.month}`}
+                                            className="border-r border-cyan-600 text-right font-medium text-gray-800 last:border-r-0"
+                                          >
+                                            {value}
+                                          </TableCell>
+                                        );
+                                      })}
+                                    </TableRow>
+                                  ))}
+                                  <TableRow className="border-t-2 border-cyan-600 bg-white font-bold hover:bg-white">
+                                    <TableCell className="border-r border-cyan-600 text-gray-900">
+                                      {t("results.totals")}
+                                    </TableCell>
+                                    {debtPlan.months.slice(0, 6).map((month) => (
+                                      <TableCell
+                                        key={`total-${month.month}`}
+                                        className="border-r border-cyan-600 text-right text-gray-900 last:border-r-0"
+                                      >
                                         ${formatCurrency(month.totalBalance)}
-                                      </TableCell>,
-                                      <TableCell key={`total-payment-${month.month}`} className={cellClass}>
-                                        ${formatCurrency(month.totalPayment)}
-                                      </TableCell>,
-                                    ];
-                                  })}
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      )}
+                                      </TableCell>
+                                    ))}
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>

@@ -1,12 +1,37 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { getAuthToken } from "@/lib/queryClient";
+
+function getLoggedInUserIdentifier(): string {
+  const token = getAuthToken();
+  if (!token) {
+    return "";
+  }
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] || ""));
+    if (typeof payload.email === "string" && payload.email) {
+      return payload.email;
+    }
+    if (typeof payload.userId === "string" && payload.userId) {
+      return payload.userId;
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
 
 function sendVisit(payload: { page: string; button?: string; section?: string }) {
   if (payload.page.startsWith("/admin")) {
     return;
   }
 
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify({
+    ...payload,
+    userIdentifier: getLoggedInUserIdentifier(),
+  });
 
   if (navigator.sendBeacon) {
     const blob = new Blob([body], { type: "application/json" });
