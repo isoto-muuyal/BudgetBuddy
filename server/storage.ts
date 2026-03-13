@@ -26,6 +26,7 @@ export interface IStorage {
   // Debt methods
   getDebtsByUser(userId: string): Promise<Debt[]>;
   createDebt(userId: string, debt: InsertDebt): Promise<Debt>;
+  updateDebtInterestRate(userId: string, debtId: string, interestRate: string): Promise<Debt>;
   deleteDebt(userId: string, debtId: string): Promise<void>;
 
   // App version methods
@@ -222,6 +223,20 @@ export class DatabaseStorage implements IStorage {
     if (!debt) {
       throw new Error("Failed to create debt");
     }
+    return debt;
+  }
+
+  async updateDebtInterestRate(userId: string, debtId: string, interestRate: string): Promise<Debt> {
+    const [debt] = await db
+      .update(debts)
+      .set({ interestRate })
+      .where(and(eq(debts.id, debtId), eq(debts.userId, userId)))
+      .returning();
+
+    if (!debt) {
+      throw new Error("Debt not found");
+    }
+
     return debt;
   }
 

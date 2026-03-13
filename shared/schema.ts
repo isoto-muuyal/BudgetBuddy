@@ -41,6 +41,7 @@ export const debts = pgTable("debts", {
   name: text("name").notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   monthlyPayment: decimal("monthly_payment", { precision: 10, scale: 2 }).notNull(),
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -94,6 +95,11 @@ export const debtInputSchema = z.object({
   name: z.string().min(1, "Debt name is required"),
   totalAmount: z.string().min(1, "Total amount is required"),
   monthlyPayment: z.string().min(1, "Monthly payment is required"),
+  interestRate: z.string().min(1, "Interest rate is required"),
+});
+
+export const debtUpdateSchema = z.object({
+  interestRate: z.string().min(1, "Interest rate is required"),
 });
 
 export const forgotPasswordSchema = z.object({

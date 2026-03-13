@@ -10,7 +10,7 @@ import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema, debtUpdateSchema } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
@@ -351,7 +351,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: debtData.name,
         totalAmount: debtData.totalAmount,
         monthlyPayment: debtData.monthlyPayment,
+        interestRate: debtData.interestRate,
       });
+      res.json(debt);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/debts/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const debtData = debtUpdateSchema.parse(req.body);
+      const debt = await storage.updateDebtInterestRate(req.user.id, req.params.id, debtData.interestRate);
       res.json(debt);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

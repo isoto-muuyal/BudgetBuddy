@@ -152,8 +152,13 @@ export async function ensureDatabaseSchema(): Promise<void> {
         name text NOT NULL,
         total_amount numeric(10,2) NOT NULL,
         monthly_payment numeric(10,2) NOT NULL,
+        interest_rate numeric(5,2) NOT NULL DEFAULT 0,
         created_at timestamp DEFAULT now()
       )
+    `);
+    await pool.query(`
+      ALTER TABLE debts
+      ADD COLUMN IF NOT EXISTS interest_rate numeric(5,2) NOT NULL DEFAULT 0
     `);
     await ensureAppVersionsTable();
     await ensureAdminTable();

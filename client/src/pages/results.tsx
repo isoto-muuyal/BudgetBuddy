@@ -31,7 +31,10 @@ export default function Results({ params }: ResultsProps) {
     name: "",
     totalAmount: "",
     monthlyPayment: "",
+    interestRate: "",
   });
+  const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
+  const [editingInterestRate, setEditingInterestRate] = useState("");
 
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
@@ -60,13 +63,13 @@ export default function Results({ params }: ResultsProps) {
   });
 
   const addDebtMutation = useMutation({
-    mutationFn: async (payload: { name: string; totalAmount: string; monthlyPayment: string }) => {
+    mutationFn: async (payload: { name: string; totalAmount: string; monthlyPayment: string; interestRate: string }) => {
       const response = await apiRequest("POST", "/api/debts", payload);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-      setDebtForm({ name: "", totalAmount: "", monthlyPayment: "" });
+      setDebtForm({ name: "", totalAmount: "", monthlyPayment: "", interestRate: "" });
       toast({
         title: t("common.success"),
         description: t("results.debtAdded"),
@@ -87,6 +90,31 @@ export default function Results({ params }: ResultsProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+    },
+  });
+
+  const updateDebtMutation = useMutation({
+    mutationFn: async (payload: { debtId: string; interestRate: string }) => {
+      const response = await apiRequest("PATCH", `/api/debts/${payload.debtId}`, {
+        interestRate: payload.interestRate,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
+      setEditingDebtId(null);
+      setEditingInterestRate("");
+      toast({
+        title: t("common.success"),
+        description: "Debt updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("common.error"),
+        description: error?.message || "Failed to update debt.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -156,7 +184,7 @@ export default function Results({ params }: ResultsProps) {
   };
 
   const handleAddDebt = () => {
-    if (!debtForm.name || !debtForm.totalAmount || !debtForm.monthlyPayment) {
+    if (!debtForm.name || !debtForm.totalAmount || !debtForm.monthlyPayment || !debtForm.interestRate) {
       toast({
         title: t("common.error"),
         description: t("results.debtFieldsMissing"),
@@ -169,6 +197,7 @@ export default function Results({ params }: ResultsProps) {
       name: debtForm.name,
       totalAmount: debtForm.totalAmount,
       monthlyPayment: debtForm.monthlyPayment,
+      interestRate: debtForm.interestRate,
     });
   };
 
@@ -800,6 +829,12 @@ export default function Results({ params }: ResultsProps) {
                           onChange={(event) => setDebtForm({ ...debtForm, monthlyPayment: event.target.value })}
                           data-testid="input-debt-monthly"
                         />
+                        <Input
+                          placeholder="Interest rate (%)"
+                          value={debtForm.interestRate}
+                          onChange={(event) => setDebtForm({ ...debtForm, interestRate: event.target.value })}
+                          data-testid="input-debt-interest-rate"
+                        />
                       </div>
                       <Button
                         onClick={handleAddDebt}
@@ -825,26 +860,80 @@ export default function Results({ params }: ResultsProps) {
                           {debts.map((debt) => (
                             <div
                               key={debt.id}
-                              className="flex items-center justify-between rounded-lg border border-gray-200 p-3"
+                              className="cursor-pointer rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50"
+                              onClick={() => {
+                                setEditingDebtId(debt.id);
+                                setEditingInterestRate(String(parseAmount(debt.interestRate)));
+                              }}
                               data-testid={`debt-row-${debt.id}`}
                             >
-                              <div>
-                                <div className="font-medium text-gray-900">{debt.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {t("results.debtSummary", {
-                                    total: `$${formatCurrency(parseAmount(debt.totalAmount))}`,
-                                    monthly: `$${formatCurrency(parseAmount(debt.monthlyPayment))}`,
-                                  })}
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <div className="font-medium text-gray-900">{debt.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {t("results.debtSummary", {
+                                      total: `$${formatCurrency(parseAmount(debt.totalAmount))}`,
+                                      monthly: `$${formatCurrency(parseAmount(debt.monthlyPayment))}`,
+                                    })}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Interest: {parseAmount(debt.interestRate).toFixed(2)}%
+                                  </div>
                                 </div>
+
+                                {editingDebtId === debt.id ? (
+                                  <div
+                                    className="flex items-center gap-2"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    <Input
+                                      className="h-8 w-36"
+                                      value={editingInterestRate}
+                                      onChange={(event) => setEditingInterestRate(event.target.value)}
+                                      placeholder="%"
+                                      data-testid={`input-edit-interest-${debt.id}`}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        updateDebtMutation.mutate({
+                                          debtId: debt.id,
+                                          interestRate: editingInterestRate,
+                                        })
+                                      }
+                                      disabled={updateDebtMutation.isPending}
+                                      data-testid={`button-save-debt-${debt.id}`}
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingDebtId(null);
+                                        setEditingInterestRate("");
+                                      }}
+                                      data-testid={`button-cancel-debt-${debt.id}`}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400">Click to edit interest rate</div>
+                                )}
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteDebtMutation.mutate(debt.id);
+                                  }}
+                                  data-testid={`button-delete-debt-${debt.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => deleteDebtMutation.mutate(debt.id)}
-                                data-testid={`button-delete-debt-${debt.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
                             </div>
                           ))}
                         </div>
