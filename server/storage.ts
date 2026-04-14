@@ -1,9 +1,45 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
-import { users, budgetAnalyses, debts, appVersions, admins, type User, type InsertUser, type BudgetAnalysis, type InsertBudgetAnalysis, type Debt, type InsertDebt, type AppVersion, type Admin } from "@shared/schema";
+import {
+  users,
+  budgetAnalyses,
+  debts,
+  appVersions,
+  admins,
+  analysisEmbeddings,
+  globalAdviceSnapshots,
+  type User,
+  type InsertUser,
+  type BudgetAnalysis,
+  type InsertBudgetAnalysis,
+  type Debt,
+  type InsertDebt,
+  type AppVersion,
+  type Admin,
+} from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
+
+export interface AnalysisEmbeddingRecord {
+  id: string;
+  userId: string;
+  analysisId: string;
+  summary: string;
+  embedding: number[];
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+export interface GlobalAdviceSnapshotRecord {
+  id: string;
+  userId: string;
+  analysisId: string;
+  advice: string;
+  progressStatus: string;
+  supportingAnalysisIds: string[];
+  createdAt: Date | null;
+}
 
 export interface IStorage {
   // User methods
@@ -20,8 +56,24 @@ export interface IStorage {
   // Budget analysis methods
   getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined>;
   getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
+  getCompletedBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
   createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<BudgetAnalysis>;
   updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis>;
+  upsertAnalysisEmbedding(input: {
+    userId: string;
+    analysisId: string;
+    summary: string;
+    embedding: number[];
+  }): Promise<AnalysisEmbeddingRecord>;
+  getAnalysisEmbeddingsByUser(userId: string): Promise<AnalysisEmbeddingRecord[]>;
+  createGlobalAdviceSnapshot(input: {
+    userId: string;
+    analysisId: string;
+    advice: string;
+    progressStatus: string;
+    supportingAnalysisIds: string[];
+  }): Promise<GlobalAdviceSnapshotRecord>;
+  getLatestGlobalAdviceByUser(userId: string): Promise<GlobalAdviceSnapshotRecord | undefined>;
 
   // Debt methods
   getDebtsByUser(userId: string): Promise<Debt[]>;
@@ -76,6 +128,50 @@ export class DatabaseStorage implements IStorage {
       }
       return [];
     }
+  }
+
+  private serializeEmbedding(value: number[] | string): string {
+    if (typeof value === "string") return value;
+    return JSON.stringify(value);
+  }
+
+  private deserializeEmbedding(value: string): number[] {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map((item) => Number(item) || 0) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private serializeStringArray(value: string[]): string {
+    return JSON.stringify(value);
+  }
+
+  private deserializeStringArray(value: string | null): string[] {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private toEmbeddingRecord(record: typeof analysisEmbeddings.$inferSelect): AnalysisEmbeddingRecord {
+    return {
+      ...record,
+      summary: this.decryptString(record.summary) || "",
+      embedding: this.deserializeEmbedding(record.embedding),
+    };
+  }
+
+  private toGlobalAdviceRecord(record: typeof globalAdviceSnapshots.$inferSelect): GlobalAdviceSnapshotRecord {
+    return {
+      ...record,
+      advice: this.decryptString(record.advice) || "",
+      supportingAnalysisIds: this.deserializeStringArray(record.supportingAnalysisIds),
+    };
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -163,6 +259,19 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getCompletedBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
+    const analyses = await db
+      .select()
+      .from(budgetAnalyses)
+      .where(and(eq(budgetAnalyses.userId, userId), eq(budgetAnalyses.analysisStatus, "completed")));
+
+    return analyses.map(analysis => ({
+      ...analysis,
+      expenses: this.decryptExpenses(analysis.expenses),
+      recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
+    }));
+  }
+
   async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
     // Encrypt expenses and recommendations before storing
     const encryptedAnalysis = {
@@ -208,6 +317,101 @@ export class DatabaseStorage implements IStorage {
       expenses: this.decryptExpenses(analysis.expenses),
       recommendations: analysis.recommendations ? this.decryptString(analysis.recommendations) : analysis.recommendations,
     };
+  }
+
+  async upsertAnalysisEmbedding(input: {
+    userId: string;
+    analysisId: string;
+    summary: string;
+    embedding: number[];
+  }): Promise<AnalysisEmbeddingRecord> {
+    const existing = await db
+      .select()
+      .from(analysisEmbeddings)
+      .where(eq(analysisEmbeddings.analysisId, input.analysisId))
+      .limit(1);
+
+    const encryptedSummary = encrypt(input.summary);
+    const serializedEmbedding = this.serializeEmbedding(input.embedding);
+
+    if (existing[0]) {
+      const [updated] = await db
+        .update(analysisEmbeddings)
+        .set({
+          summary: encryptedSummary,
+          embedding: serializedEmbedding,
+          updatedAt: new Date(),
+        })
+        .where(eq(analysisEmbeddings.analysisId, input.analysisId))
+        .returning();
+
+      if (!updated) {
+        throw new Error("Failed to update analysis embedding");
+      }
+
+      return this.toEmbeddingRecord(updated);
+    }
+
+    const [created] = await db
+      .insert(analysisEmbeddings)
+      .values({
+        userId: input.userId,
+        analysisId: input.analysisId,
+        summary: encryptedSummary,
+        embedding: serializedEmbedding,
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error("Failed to create analysis embedding");
+    }
+
+    return this.toEmbeddingRecord(created);
+  }
+
+  async getAnalysisEmbeddingsByUser(userId: string): Promise<AnalysisEmbeddingRecord[]> {
+    const rows = await db
+      .select()
+      .from(analysisEmbeddings)
+      .where(eq(analysisEmbeddings.userId, userId));
+
+    return rows.map((row) => this.toEmbeddingRecord(row));
+  }
+
+  async createGlobalAdviceSnapshot(input: {
+    userId: string;
+    analysisId: string;
+    advice: string;
+    progressStatus: string;
+    supportingAnalysisIds: string[];
+  }): Promise<GlobalAdviceSnapshotRecord> {
+    const [created] = await db
+      .insert(globalAdviceSnapshots)
+      .values({
+        userId: input.userId,
+        analysisId: input.analysisId,
+        advice: encrypt(input.advice),
+        progressStatus: input.progressStatus,
+        supportingAnalysisIds: this.serializeStringArray(input.supportingAnalysisIds),
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error("Failed to create global advice snapshot");
+    }
+
+    return this.toGlobalAdviceRecord(created);
+  }
+
+  async getLatestGlobalAdviceByUser(userId: string): Promise<GlobalAdviceSnapshotRecord | undefined> {
+    const [row] = await db
+      .select()
+      .from(globalAdviceSnapshots)
+      .where(eq(globalAdviceSnapshots.userId, userId))
+      .orderBy(desc(globalAdviceSnapshots.createdAt))
+      .limit(1);
+
+    return row ? this.toGlobalAdviceRecord(row) : undefined;
   }
 
   async getDebtsByUser(userId: string): Promise<Debt[]> {

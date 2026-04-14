@@ -35,6 +35,26 @@ export const budgetAnalyses = pgTable("budget_analyses", {
   analysisStatus: text("analysis_status").default("pending"), // pending, completed, failed
 });
 
+export const analysisEmbeddings = pgTable("analysis_embeddings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  analysisId: varchar("analysis_id").notNull().references(() => budgetAnalyses.id).unique(),
+  summary: text("summary").notNull(),
+  embedding: text("embedding").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const globalAdviceSnapshots = pgTable("global_advice_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  analysisId: varchar("analysis_id").notNull().references(() => budgetAnalyses.id),
+  advice: text("advice").notNull(),
+  progressStatus: text("progress_status").notNull(),
+  supportingAnalysisIds: text("supporting_analysis_ids").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const debts = pgTable("debts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -118,6 +138,8 @@ export type SignupUser = z.infer<typeof signupSchema>;
 export type IncomeInput = z.infer<typeof incomeSchema>;
 export type BudgetAnalysis = typeof budgetAnalyses.$inferSelect;
 export type InsertBudgetAnalysis = z.infer<typeof insertBudgetAnalysisSchema>;
+export type AnalysisEmbedding = typeof analysisEmbeddings.$inferSelect;
+export type GlobalAdviceSnapshot = typeof globalAdviceSnapshots.$inferSelect;
 export type Debt = typeof debts.$inferSelect;
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

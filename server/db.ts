@@ -59,10 +59,37 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensureAnalysisIntelligenceTables = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analysis_embeddings (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id),
+        analysis_id uuid NOT NULL UNIQUE REFERENCES budget_analyses(id),
+        summary text NOT NULL,
+        embedding text NOT NULL,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS global_advice_snapshots (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id),
+        analysis_id uuid NOT NULL REFERENCES budget_analyses(id),
+        advice text NOT NULL,
+        progress_status text NOT NULL,
+        supporting_analysis_ids text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  };
+
   const shouldAutoPush = process.env.AUTO_DB_PUSH !== "false";
   if (!shouldAutoPush) {
     await ensureAppVersionsTable();
     await ensureAdminTable();
+    await ensureAnalysisIntelligenceTables();
     return;
   }
 
@@ -77,12 +104,14 @@ export async function ensureDatabaseSchema(): Promise<void> {
     if (hasUsersTable && hasAppVersionsTable && hasAdminTable) {
       await ensureAppVersionsTable();
       await ensureAdminTable();
+      await ensureAnalysisIntelligenceTables();
       return;
     }
 
     if (hasUsersTable) {
       await ensureAppVersionsTable();
       await ensureAdminTable();
+      await ensureAnalysisIntelligenceTables();
       console.log("app_versions and ADMIN tables ensured successfully.");
       return;
     }
@@ -105,6 +134,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       if (!verifiedAdmins) {
         await ensureAdminTable();
       }
+      await ensureAnalysisIntelligenceTables();
       console.log("Database schema created successfully.");
       return;
     }
@@ -162,6 +192,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
     await ensureAppVersionsTable();
     await ensureAdminTable();
+    await ensureAnalysisIntelligenceTables();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);
