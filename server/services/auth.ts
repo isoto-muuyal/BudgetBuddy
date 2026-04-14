@@ -7,7 +7,7 @@ import { emailService } from "./email";
 import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
 export class AuthService {
-  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean }) {
+  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null }) {
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwt.secret,
@@ -21,7 +21,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         monthlyIncome: user.monthlyIncome,
-        emailVerified: user.emailVerified,
+        emailVerified: !!user.emailVerified,
       },
     };
   }

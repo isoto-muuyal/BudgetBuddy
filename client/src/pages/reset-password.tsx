@@ -31,7 +31,7 @@ export default function ResetPassword() {
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       token: "",
-      password: "",
+      newPassword: "",
     },
   });
 
@@ -115,7 +115,7 @@ export default function ResetPassword() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="password"
+                  name="newPassword"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>{t("reset.password")}</FormLabel>

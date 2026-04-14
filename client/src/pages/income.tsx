@@ -30,6 +30,10 @@ export default function Income() {
     queryKey: ["/api/user/profile"],
   });
 
+  const { data: latestGlobalAdvice } = useQuery<any>({
+    queryKey: ["/api/global-advice/latest"],
+  });
+
   useEffect(() => {
     if (userProfile?.monthlyIncome) {
       form.setValue("monthlyIncome", userProfile.monthlyIncome.toString(), { shouldValidate: true });
@@ -130,6 +134,20 @@ export default function Income() {
                     <span data-testid="text-savings-amount">${budget.savings.toFixed(2)}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-lg" data-testid="card-latest-global-advice">
+                <h3 className="font-medium text-gray-900 mb-2">{t("income.latestGlobalAdviceTitle")}</h3>
+                {latestGlobalAdvice?.advice ? (
+                  <div className="space-y-2 text-sm text-gray-700 whitespace-pre-line">
+                    <p>{latestGlobalAdvice.advice}</p>
+                    <p className="text-xs uppercase tracking-wide text-emerald-700">
+                      {t("income.latestGlobalAdviceStatus", { status: latestGlobalAdvice.progressStatus })}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">{t("income.latestGlobalAdviceEmpty")}</p>
+                )}
               </div>
 
               <Button

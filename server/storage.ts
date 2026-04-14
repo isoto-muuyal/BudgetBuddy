@@ -21,6 +21,11 @@ import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
+export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
+  expenses: unknown[];
+  recommendations: string | null;
+};
+
 export interface AnalysisEmbeddingRecord {
   id: string;
   userId: string;
@@ -54,11 +59,11 @@ export interface IStorage {
   resetPassword(userId: string, newPassword: string): Promise<void>;
 
   // Budget analysis methods
-  getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined>;
-  getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
-  getCompletedBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]>;
-  createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<BudgetAnalysis>;
-  updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis>;
+  getBudgetAnalysis(id: string): Promise<StoredBudgetAnalysis | undefined>;
+  getBudgetAnalysesByUser(userId: string): Promise<StoredBudgetAnalysis[]>;
+  getCompletedBudgetAnalysesByUser(userId: string): Promise<StoredBudgetAnalysis[]>;
+  createBudgetAnalysis(analysis: InsertBudgetAnalysis): Promise<StoredBudgetAnalysis>;
+  updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<StoredBudgetAnalysis>;
   upsertAnalysisEmbedding(input: {
     userId: string;
     analysisId: string;
@@ -236,7 +241,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
-  async getBudgetAnalysis(id: string): Promise<BudgetAnalysis | undefined> {
+  async getBudgetAnalysis(id: string): Promise<StoredBudgetAnalysis | undefined> {
     const [analysis] = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.id, id));
     if (!analysis) return undefined;
     
@@ -248,7 +253,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
+  async getBudgetAnalysesByUser(userId: string): Promise<StoredBudgetAnalysis[]> {
     const analyses = await db.select().from(budgetAnalyses).where(eq(budgetAnalyses.userId, userId));
     
     // Decrypt expenses and recommendations for each analysis
@@ -259,7 +264,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getCompletedBudgetAnalysesByUser(userId: string): Promise<BudgetAnalysis[]> {
+  async getCompletedBudgetAnalysesByUser(userId: string): Promise<StoredBudgetAnalysis[]> {
     const analyses = await db
       .select()
       .from(budgetAnalyses)
@@ -272,7 +277,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<BudgetAnalysis> {
+  async createBudgetAnalysis(insertAnalysis: InsertBudgetAnalysis): Promise<StoredBudgetAnalysis> {
     // Encrypt expenses and recommendations before storing
     const encryptedAnalysis = {
       ...insertAnalysis,
@@ -293,7 +298,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<BudgetAnalysis> {
+  async updateBudgetAnalysis(id: string, updates: Partial<BudgetAnalysis>): Promise<StoredBudgetAnalysis> {
     // Encrypt expenses and recommendations if they're being updated
     const encryptedUpdates = {
       ...updates,

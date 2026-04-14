@@ -74,6 +74,9 @@ const resources = {
         history: "View Previous Reports",
         updatedTitle: "Success",
         updatedDesc: "Monthly income updated successfully",
+        latestGlobalAdviceTitle: "Latest Global Advice",
+        latestGlobalAdviceEmpty: "No global advice yet. Complete a new analysis to generate one.",
+        latestGlobalAdviceStatus: "Trend: {{status}}",
       },
       budget: {
         title: "Your Budget Plan",

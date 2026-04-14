@@ -45,7 +45,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!config.google.clientId || !config.google.clientSecret || !config.google.redirectUrl) {
       throw new Error("Google OAuth is not configured");
     }
-    const issuer = await openidClient.Issuer.discover("https://accounts.google.com");
+    const openid = openidClient as any;
+    const issuer = await openid.Issuer.discover("https://accounts.google.com");
     return new issuer.Client({
       client_id: config.google.clientId,
       client_secret: config.google.clientSecret,
@@ -56,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   function cleanupGoogleStates() {
     const now = Date.now();
-    for (const [key, value] of googleStateStore.entries()) {
+    for (const [key, value] of Array.from(googleStateStore.entries())) {
       if (now - value.createdAt > 10 * 60 * 1000) {
         googleStateStore.delete(key);
       }
@@ -251,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Start async processing
-      processFileAsync(analysis.id, filePath, monthlyIncome);
+      processFileAsync(user.id, analysis.id, filePath, monthlyIncome);
 
       res.json({
         message: "File uploaded successfully",
@@ -267,6 +268,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
       res.json(analyses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/global-advice/latest", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const latestAdvice = await storage.getLatestGlobalAdviceByUser(req.user.id);
+      res.json(latestAdvice ?? null);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -382,9 +392,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       cleanupGoogleStates();
       const client = await getGoogleClient();
-      const codeVerifier = openidClient.generators.codeVerifier();
-      const codeChallenge = openidClient.generators.codeChallenge(codeVerifier);
-      const state = openidClient.generators.state();
+      const openid = openidClient as any;
+      const codeVerifier = openid.generators.codeVerifier();
+      const codeChallenge = openid.generators.codeChallenge(codeVerifier);
+      const state = openid.generators.state();
 
       googleStateStore.set(state, { codeVerifier, createdAt: Date.now() });
 
@@ -460,14 +471,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 // Async file processing function
-async function processFileAsync(analysisId: string, filePath: string, monthlyIncome: number) {
+async function processFileAsync(userId: string, analysisId: string, filePath: string, monthlyIncome: number) {
   try {
 
     // Extract text from file
     const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
     
     // Analyze with AI
-    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome);
+    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome, {
+      userId,
+      analysisId,
+      runGlobalAdvisor: true,
+    });
     console.log(`AI analysis result for ${analysisId}:`, aiResult);
 
     // Update analysis with results
