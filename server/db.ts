@@ -62,9 +62,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
   const ensureAnalysisIntelligenceTables = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analysis_embeddings (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id uuid NOT NULL REFERENCES users(id),
-        analysis_id uuid NOT NULL UNIQUE REFERENCES budget_analyses(id),
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        analysis_id varchar NOT NULL UNIQUE REFERENCES budget_analyses(id),
         summary text NOT NULL,
         embedding text NOT NULL,
         created_at timestamp DEFAULT now(),
@@ -74,9 +74,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS global_advice_snapshots (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id uuid NOT NULL REFERENCES users(id),
-        analysis_id uuid NOT NULL REFERENCES budget_analyses(id),
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        analysis_id varchar NOT NULL REFERENCES budget_analyses(id),
         advice text NOT NULL,
         progress_status text NOT NULL,
         supporting_analysis_ids text NOT NULL,
@@ -143,7 +143,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await pool.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
         email text NOT NULL UNIQUE,
         full_name text NOT NULL,
         password text NOT NULL,
@@ -157,8 +157,8 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS budget_analyses (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id uuid NOT NULL REFERENCES users(id),
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
         file_name text NOT NULL,
         original_file_name text NOT NULL,
         upload_date timestamp DEFAULT now(),
@@ -177,8 +177,8 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS debts (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id uuid NOT NULL REFERENCES users(id),
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
         name text NOT NULL,
         total_amount numeric(10,2) NOT NULL,
         monthly_payment numeric(10,2) NOT NULL,
