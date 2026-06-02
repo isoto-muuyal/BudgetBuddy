@@ -3,6 +3,7 @@ import { InferenceClient } from "@huggingface/inference";
 import { config } from "../config";
 import { storage } from "../storage";
 import { vectorStoreService } from "./vector-store-service";
+import { mcpClientService } from "./mcp-client-service";
 
 export const CATEGORIZER_AGENT = "CATEGORIZER_AGENT";
 export const CATEGORIZER_TOOL = "CATEGORIZER_TOOL";
@@ -61,6 +62,16 @@ interface CategorizationResponse {
 interface GlobalAdviceResponse {
   progressStatus?: string;
   advice?: string;
+}
+
+interface McpCategorizationResponse extends Record<string, unknown> {
+  expenses?: CategorizedExpense[];
+}
+
+interface McpRecommendationsResponse extends Record<string, unknown> {
+  recommendations?: string;
+  advice?: string;
+  text?: string;
 }
 
 export class AIService {
@@ -147,6 +158,14 @@ export class AIService {
     }
 
     try {
+      if (mcpClientService.isEnabled()) {
+        const response = await mcpClientService.callTool<string | McpRecommendationsResponse>(
+          config.mcp.tools.generateHistoryPatterns,
+          { rows }
+        );
+        return this.extractMcpText(response, "patterns");
+      }
+
       const response = await this.runTextCompletion({
         systemPrompt:
           "You are a financial analyst. Identify patterns and trends across multiple monthly analyses. Focus on consistent overspending or underspending categories, and summarize clear behavioral patterns.",
@@ -175,6 +194,21 @@ export class AIService {
     const prompt = this.buildCategorizationPrompt(textContent, monthlyIncome);
 
     try {
+      if (mcpClientService.isEnabled()) {
+        console.log(`${CATEGORIZER_TOOL}: calling MCP`);
+        const response = await mcpClientService.callTool<McpCategorizationResponse | CategorizedExpense[]>(
+          config.mcp.tools.categorizeTransactions,
+          {
+            textContent,
+            monthlyIncome,
+            ruleset: "50/30/20",
+            categories: ["50%", "30%", "20%", "undefined"],
+          }
+        );
+        const expenses = Array.isArray(response) ? response : response.expenses;
+        return this.normalizeExpenses(Array.isArray(expenses) ? expenses : []);
+      }
+
       console.log(`${CATEGORIZER_TOOL}: calling AI`);
       const responseText = await this.runJsonCompletion({
         systemPrompt:
@@ -206,6 +240,26 @@ export class AIService {
     const prompt = this.buildRecommendationsPrompt(expenses, monthlyIncome);
 
     try {
+      if (mcpClientService.isEnabled()) {
+        console.log(`${ADVISOR_TOOL}: calling MCP`);
+        const totals = this.calculateTotalsFromExpenses(expenses);
+        const response = await mcpClientService.callTool<string | McpRecommendationsResponse>(
+          config.mcp.tools.generateBudgetRecommendations,
+          {
+            expenses,
+            monthlyIncome,
+            totals,
+            recommended: {
+              needs: monthlyIncome * 0.5,
+              wants: monthlyIncome * 0.3,
+              savings: monthlyIncome * 0.2,
+            },
+            ruleset: "50/30/20",
+          }
+        );
+        return this.extractMcpText(response, "recommendations");
+      }
+
       console.log(`${ADVISOR_TOOL}: calling AI`);
       const responseText = await this.runTextCompletion({
         systemPrompt:
@@ -346,6 +400,28 @@ export class AIService {
     });
 
     try {
+      if (mcpClientService.isEnabled()) {
+        console.log(`${GLOBAL_ADVISOR_TOOL}: calling MCP`);
+        const response = await mcpClientService.callTool<GlobalAdviceResponse>(
+          config.mcp.tools.generateGlobalAdvice,
+          {
+            analysisId: input.analysisId,
+            currentSummary: input.currentSummary,
+            recentHistory,
+            similarAnalyses: input.similarAnalyses.map((analysis) => ({
+              analysisId: analysis.analysisId,
+              score: Number(analysis.score.toFixed(4)),
+              summary: analysis.summary,
+            })),
+          }
+        );
+        return {
+          advice: this.normalizeThreeLineAdvice(response.advice || ""),
+          progressStatus: this.normalizeProgressStatus(response.progressStatus),
+          supportingAnalysisIds: input.similarAnalyses.map((analysis) => analysis.analysisId),
+        };
+      }
+
       console.log(`${GLOBAL_ADVISOR_TOOL}: calling AI`);
       const responseText = await this.runJsonCompletion({
         systemPrompt:
@@ -607,6 +683,28 @@ Keep the response concise and actionable with bullet points.
     }
 
     return cleaned;
+  }
+
+  private extractMcpText(response: string | Record<string, unknown>, preferredKey: string): string {
+    if (typeof response === "string") {
+      return this.parseRecommendationsResponse(response);
+    }
+
+    const candidates = [
+      response[preferredKey],
+      response.recommendations,
+      response.patterns,
+      response.advice,
+      response.text,
+      response.message,
+    ];
+
+    const text = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    if (!text) {
+      throw new Error(`MCP response did not include text field "${preferredKey}"`);
+    }
+
+    return this.parseRecommendationsResponse(text);
   }
 
   private normalizeExpenses(rawExpenses: any[]): CategorizedExpense[] {

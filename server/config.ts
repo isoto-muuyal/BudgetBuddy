@@ -23,6 +23,22 @@ export const config = {
     model: process.env.AI_MODEL || "instruction-pretrain/finance-Llama3-8B",
     accessToken: process.env.AI_ACCESS_TOKEN || "",
   },
+  mcp: {
+    baseUrl: process.env.MCP_BASE_URL || "",
+    loginPath: process.env.MCP_LOGIN_PATH || "/login",
+    toolsPath: process.env.MCP_TOOLS_PATH || "/mcp",
+    username: process.env.MCP_USERNAME || "",
+    password: process.env.MCP_PASSWORD || "",
+    loginBodyJson: process.env.MCP_LOGIN_BODY_JSON || "",
+    jwt: process.env.MCP_JWT || "",
+    tools: {
+      categorizeTransactions: process.env.MCP_TOOL_CATEGORIZE_TRANSACTIONS || "categorize_transactions",
+      generateBudgetRecommendations:
+        process.env.MCP_TOOL_GENERATE_BUDGET_RECOMMENDATIONS || "generate_budget_recommendations",
+      generateHistoryPatterns: process.env.MCP_TOOL_GENERATE_HISTORY_PATTERNS || "generate_history_patterns",
+      generateGlobalAdvice: process.env.MCP_TOOL_GENERATE_GLOBAL_ADVICE || "generate_global_advice",
+    },
+  },
   jwt: {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",

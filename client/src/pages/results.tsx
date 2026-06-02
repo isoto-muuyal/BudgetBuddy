@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { BarChart3, Bot, Download, Upload, FileText, Calendar, Loader2, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { BarChart3, Bot, Download, Upload, FileText, Calendar, Loader2, Wallet, TrendingUp, Target } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Area, AreaChart } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,13 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { generateAndDownloadPDF } from "@/components/ExpenseReportPDF";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import DebtDashboard from "@/components/debt-dashboard";
 
 interface ResultsProps {
   params: { id: string };
@@ -26,15 +26,6 @@ export default function Results({ params }: ResultsProps) {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [debtIncomePercent, setDebtIncomePercent] = useState("10");
-  const [debtForm, setDebtForm] = useState({
-    name: "",
-    totalAmount: "",
-    monthlyPayment: "",
-    interestRate: "",
-  });
-  const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
-  const [editingInterestRate, setEditingInterestRate] = useState("");
 
   const { data: analysis, isLoading } = useQuery<any>({
     queryKey: ["/api/analysis", analysisId],
@@ -56,66 +47,6 @@ export default function Results({ params }: ResultsProps) {
 
   const { data: userProfile } = useQuery<any>({
     queryKey: ["/api/user/profile"],
-  });
-
-  const { data: debts = [], isLoading: debtsLoading } = useQuery<any[]>({
-    queryKey: ["/api/debts"],
-  });
-
-  const addDebtMutation = useMutation({
-    mutationFn: async (payload: { name: string; totalAmount: string; monthlyPayment: string; interestRate: string }) => {
-      const response = await apiRequest("POST", "/api/debts", payload);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-      setDebtForm({ name: "", totalAmount: "", monthlyPayment: "", interestRate: "" });
-      toast({
-        title: t("common.success"),
-        description: t("results.debtAdded"),
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t("common.error"),
-        description: error?.message || t("results.debtAddFailed"),
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteDebtMutation = useMutation({
-    mutationFn: async (debtId: string) => {
-      await apiRequest("DELETE", `/api/debts/${debtId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-    },
-  });
-
-  const updateDebtMutation = useMutation({
-    mutationFn: async (payload: { debtId: string; interestRate: string }) => {
-      const response = await apiRequest("PATCH", `/api/debts/${payload.debtId}`, {
-        interestRate: payload.interestRate,
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debts"] });
-      setEditingDebtId(null);
-      setEditingInterestRate("");
-      toast({
-        title: t("common.success"),
-        description: "Debt updated successfully.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t("common.error"),
-        description: error?.message || "Failed to update debt.",
-        variant: "destructive",
-      });
-    },
   });
 
   const monthlyIncome = parseFloat(analysis?.monthlyIncome ?? "0");
@@ -183,24 +114,6 @@ export default function Results({ params }: ResultsProps) {
     }
   };
 
-  const handleAddDebt = () => {
-    if (!debtForm.name || !debtForm.totalAmount || !debtForm.monthlyPayment || !debtForm.interestRate) {
-      toast({
-        title: t("common.error"),
-        description: t("results.debtFieldsMissing"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    addDebtMutation.mutate({
-      name: debtForm.name,
-      totalAmount: debtForm.totalAmount,
-      monthlyPayment: debtForm.monthlyPayment,
-      interestRate: debtForm.interestRate,
-    });
-  };
-
   const handleDownloadRecommendations = () => {
     if (!analysis?.recommendations) {
       toast({
@@ -255,143 +168,6 @@ export default function Results({ params }: ResultsProps) {
     return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const debtMetrics = useMemo(() => {
-    const selectedPercent = Number.parseFloat(debtIncomePercent);
-    const normalizedPercent = Number.isFinite(selectedPercent) ? selectedPercent : 0;
-    const totalDebtBudget = monthlyIncome * (normalizedPercent / 100);
-    const debtCount = debts.filter((debt) => parseAmount(debt.totalAmount) > 0).length;
-    const basePayment = debtCount > 0 ? totalDebtBudget / (debtCount + 1) : 0;
-    const smallestDebtPayment = basePayment * 2;
-
-    if (!analysis) {
-      return {
-        totalMonthlyDebtPayments: 0,
-        dti: 0,
-        dtiCategory: t("results.dtiUnknown"),
-        selectedPercent: normalizedPercent,
-        totalDebtBudget,
-        basePayment,
-        smallestDebtPayment,
-      };
-    }
-
-    const totalMonthlyDebtPayments = debtCount > 0 ? totalDebtBudget : 0;
-    const dti = monthlyIncome ? (totalMonthlyDebtPayments / monthlyIncome) * 100 : 0;
-
-    const dtiCategory =
-      dti < 20
-        ? t("results.dtiExcellent")
-        : dti <= 35
-          ? t("results.dtiGood")
-          : dti <= 40
-            ? t("results.dtiFair")
-            : dti <= 49
-              ? t("results.dtiHigh")
-              : t("results.dtiDanger");
-
-    return {
-      totalMonthlyDebtPayments,
-      dti,
-      dtiCategory,
-      selectedPercent: normalizedPercent,
-      totalDebtBudget,
-      basePayment,
-      smallestDebtPayment,
-    };
-  }, [analysis, debtIncomePercent, debts, monthlyIncome, t]);
-
-  const debtPlan = useMemo(() => {
-    const selectedPercent = Number.parseFloat(debtIncomePercent);
-    const normalizedPercent = Number.isFinite(selectedPercent) ? selectedPercent : 0;
-    const totalDebtBudget = monthlyIncome * (normalizedPercent / 100);
-
-    const normalizedDebts = debts
-      .map((debt) => ({
-        id: debt.id,
-        name: debt.name,
-        balance: parseAmount(debt.totalAmount),
-      }))
-      .filter((debt) => debt.balance > 0)
-      .sort((a, b) => a.balance - b.balance);
-
-    if (!normalizedDebts.length || !monthlyIncome) {
-      return { months: [], monthsToHealthy: null, monthsToDebtFree: null };
-    }
-
-    const basePayment = totalDebtBudget / (normalizedDebts.length + 1);
-    if (!basePayment) {
-      return { months: [], monthsToHealthy: null, monthsToDebtFree: null };
-    }
-
-    const months: Array<{
-      month: number;
-      debts: Array<{
-        id: string;
-        name: string;
-        balanceBefore: number;
-        payment: number;
-        remainingAfter: number;
-      }>;
-      totalBalance: number;
-      totalPayment: number;
-      dti: number;
-    }> = [];
-
-    let month = 1;
-    let monthsToHealthy: number | null = null;
-
-    const maxMonths = 240;
-
-    while (month <= maxMonths && normalizedDebts.some((debt) => debt.balance > 0)) {
-      normalizedDebts.sort((a, b) => a.balance - b.balance);
-      const focusDebt = normalizedDebts.find((debt) => debt.balance > 0);
-      const focusId = focusDebt?.id;
-
-      const snapshot = normalizedDebts.map((debt) => ({
-        id: debt.id,
-        name: debt.name,
-        balanceBefore: Math.max(0, debt.balance),
-        payment: 0,
-        remainingAfter: Math.max(0, debt.balance),
-      }));
-
-      for (const debt of normalizedDebts) {
-        if (debt.balance <= 0) continue;
-
-        const targetPayment = debt.id === focusId ? basePayment * 2 : basePayment;
-        const payment = Math.min(targetPayment, debt.balance);
-        debt.balance -= payment;
-
-        const row = snapshot.find((entry) => entry.id === debt.id);
-        if (row) {
-          row.payment += payment;
-          row.remainingAfter = Math.max(0, debt.balance);
-        }
-      }
-
-      const remainingBalance = normalizedDebts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0);
-      const totalPayment = snapshot.reduce((sum, debt) => sum + debt.payment, 0);
-      const dti = monthlyIncome ? (totalPayment / monthlyIncome) * 100 : 0;
-
-      if (monthsToHealthy === null && dti <= 35) {
-        monthsToHealthy = month;
-      }
-
-      months.push({
-        month,
-        debts: snapshot,
-        totalBalance: remainingBalance,
-        totalPayment,
-        dti,
-      });
-
-      month += 1;
-    }
-
-    const monthsToDebtFree = months.length ? months[months.length - 1].month : null;
-    return { months, monthsToHealthy, monthsToDebtFree };
-  }, [debtIncomePercent, debts, monthlyIncome]);
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "completed":
@@ -445,25 +221,116 @@ export default function Results({ params }: ResultsProps) {
   const actualNeedsPercent = analysis.actualNeeds ? Math.round((parseFloat(analysis.actualNeeds) / monthlyIncome) * 100) : 0;
   const actualWantsPercent = analysis.actualWants ? Math.round((parseFloat(analysis.actualWants) / monthlyIncome) * 100) : 0;
   const actualSavingsPercent = analysis.actualSavings ? Math.round((parseFloat(analysis.actualSavings) / monthlyIncome) * 100) : 0;
+  const totalAnalyzed = parseAmount(analysis.actualNeeds) + parseAmount(analysis.actualWants) + parseAmount(analysis.actualSavings);
+  const categoryChartData = [
+    { name: "Needs", actual: parseAmount(analysis.actualNeeds), recommended: parseAmount(analysis.recommendedNeeds), fill: "#22c55e" },
+    { name: "Wants", actual: parseAmount(analysis.actualWants), recommended: parseAmount(analysis.recommendedWants), fill: "#38bdf8" },
+    { name: "Savings", actual: parseAmount(analysis.actualSavings), recommended: parseAmount(analysis.recommendedSavings), fill: "#f59e0b" },
+  ];
+  const historyChartData = (analysisHistory || [])
+    .filter((item) => item.analysisStatus === "completed")
+    .sort((a, b) => new Date(a.uploadDate).getTime() - new Date(b.uploadDate).getTime())
+    .slice(-8)
+    .map((item) => ({
+      date: new Date(item.uploadDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      needs: parseAmount(item.actualNeeds),
+      wants: parseAmount(item.actualWants),
+      savings: parseAmount(item.actualSavings),
+    }));
 
   return (
-    <div className="w-[70vw] mx-auto p-4 pt-8">
-      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-results">
-        <CardContent className="p-8">
-          <div className="text-center mb-8">
-            <div className="bg-gradient-to-r from-green-400 to-blue-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BarChart3 className="text-white text-2xl" />
+    <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-6 text-white sm:px-6 lg:px-8" data-testid="card-results">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[#202133] text-amber-400">
+              <BarChart3 className="h-5 w-5" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-results-title">
+            <h2 className="text-2xl font-semibold tracking-normal" data-testid="text-results-title">
               {t("results.title")}
             </h2>
-            <p className="text-gray-600" data-testid="text-results-description">
+            <p className="mt-1 max-w-2xl text-sm text-slate-200" data-testid="text-results-description">
               {t("results.description")}
             </p>
           </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setLocation("/upload")}
+              variant="outline"
+              className="border-white/10 bg-[#202133] text-white hover:bg-white/10"
+              data-testid="button-upload-new"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {t("results.uploadNew")}
+            </Button>
+            <Button
+              onClick={handleDownloadReport}
+              disabled={isGeneratingPDF || !userProfile || isProcessing}
+              className="bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+              data-testid="button-download"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isGeneratingPDF ? t("results.generating") : t("results.download")}
+            </Button>
+          </div>
+        </div>
 
-          <Tabs defaultValue={defaultTab} className="mt-6">
-            <TabsList className="grid w-full grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
+          <DashboardMetric icon={<Wallet className="h-4 w-4" />} label="Monthly income" value={`$${formatCurrency(monthlyIncome)}`} detail={analysis.originalFileName || "Current analysis"} />
+          <DashboardMetric icon={<Target className="h-4 w-4" />} label="Analyzed spending" value={`$${formatCurrency(totalAnalyzed)}`} detail={`${actualNeedsPercent}% needs | ${actualWantsPercent}% wants`} />
+          <DashboardMetric icon={<TrendingUp className="h-4 w-4" />} label="Savings rate" value={`${actualSavingsPercent}%`} detail={`Recommended 20%`} />
+          <DashboardMetric icon={<Calendar className="h-4 w-4" />} label="Upload date" value={analysis.uploadDate ? new Date(analysis.uploadDate).toLocaleDateString() : "-"} detail={getStatusLabel(analysis.analysisStatus)} />
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+          <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Current vs Recommended</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryChartData}>
+                    <CartesianGrid stroke="#34364a" vertical={false} />
+                    <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ background: "#171827", border: "1px solid #34364a", borderRadius: 8 }} />
+                    <Bar dataKey="actual" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="recommended" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-base">Recent Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={historyChartData}>
+                    <defs>
+                      <linearGradient id="budgetTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#34364a" vertical={false} />
+                    <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ background: "#171827", border: "1px solid #34364a", borderRadius: 8 }} />
+                    <Area type="monotone" dataKey="savings" stroke="#f59e0b" fill="url(#budgetTrend)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue={defaultTab} className="mt-6">
+            <TabsList className="grid w-full grid-cols-3 bg-[#202133] text-slate-300">
               <TabsTrigger value="analysis">{t("results.title")}</TabsTrigger>
               <TabsTrigger value="history">{t("results.history")}</TabsTrigger>
               <TabsTrigger value="debt">{t("results.debtPlan")}</TabsTrigger>
@@ -789,285 +656,23 @@ export default function Results({ params }: ResultsProps) {
             </TabsContent>
 
             <TabsContent value="debt">
-              <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-debt-plan">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-900">{t("results.debtPlan")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-6">
-                      <div className="grid gap-3">
-                        <div>
-                          <div className="text-sm text-gray-600 mb-2">Debt payment % of monthly income</div>
-                          <Select value={debtIncomePercent} onValueChange={setDebtIncomePercent}>
-                            <SelectTrigger data-testid="select-debt-income-percent">
-                              <SelectValue placeholder="Select debt payment %" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="5">5%</SelectItem>
-                              <SelectItem value="10">10%</SelectItem>
-                              <SelectItem value="15">15%</SelectItem>
-                              <SelectItem value="20">20%</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3">
-                          <Input
-                            placeholder={t("results.debtName")}
-                          value={debtForm.name}
-                          onChange={(event) => setDebtForm({ ...debtForm, name: event.target.value })}
-                          data-testid="input-debt-name"
-                        />
-                        <Input
-                          placeholder={t("results.debtTotal")}
-                          value={debtForm.totalAmount}
-                          onChange={(event) => setDebtForm({ ...debtForm, totalAmount: event.target.value })}
-                          data-testid="input-debt-total"
-                        />
-                        <Input
-                          placeholder={t("results.debtMonthly")}
-                          value={debtForm.monthlyPayment}
-                          onChange={(event) => setDebtForm({ ...debtForm, monthlyPayment: event.target.value })}
-                          data-testid="input-debt-monthly"
-                        />
-                        <Input
-                          placeholder="Interest rate (%)"
-                          value={debtForm.interestRate}
-                          onChange={(event) => setDebtForm({ ...debtForm, interestRate: event.target.value })}
-                          data-testid="input-debt-interest-rate"
-                        />
-                      </div>
-                      <Button
-                        onClick={handleAddDebt}
-                        disabled={addDebtMutation.isPending}
-                        className="bg-blue-500 text-white hover:bg-blue-600"
-                        data-testid="button-add-debt"
-                      >
-                        {t("results.debtAdd")}
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-gray-900">{t("results.debtList")}</h4>
-                        <span className="text-sm text-gray-500">
-                          {debtsLoading ? t("debt.loading") : t("results.debtCount", { count: debts.length })}
-                        </span>
-                      </div>
-                      {debts.length === 0 ? (
-                        <div className="text-sm text-gray-500">{t("results.debtEmpty")}</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {debts.map((debt) => (
-                            <div
-                              key={debt.id}
-                              className="cursor-pointer rounded-lg border border-gray-200 p-3 transition-colors hover:bg-gray-50"
-                              onClick={() => {
-                                setEditingDebtId(debt.id);
-                                setEditingInterestRate(String(parseAmount(debt.interestRate)));
-                              }}
-                              data-testid={`debt-row-${debt.id}`}
-                            >
-                              <div className="flex items-center justify-between gap-4">
-                                <div>
-                                  <div className="font-medium text-gray-900">{debt.name}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {t("results.debtSummary", {
-                                      total: `$${formatCurrency(parseAmount(debt.totalAmount))}`,
-                                      monthly: `$${formatCurrency(parseAmount(debt.monthlyPayment))}`,
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Interest: {parseAmount(debt.interestRate).toFixed(2)}%
-                                  </div>
-                                </div>
-
-                                {editingDebtId === debt.id ? (
-                                  <div
-                                    className="flex items-center gap-2"
-                                    onClick={(event) => event.stopPropagation()}
-                                  >
-                                    <Input
-                                      className="h-8 w-36"
-                                      value={editingInterestRate}
-                                      onChange={(event) => setEditingInterestRate(event.target.value)}
-                                      placeholder="%"
-                                      data-testid={`input-edit-interest-${debt.id}`}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() =>
-                                        updateDebtMutation.mutate({
-                                          debtId: debt.id,
-                                          interestRate: editingInterestRate,
-                                        })
-                                      }
-                                      disabled={updateDebtMutation.isPending}
-                                      data-testid={`button-save-debt-${debt.id}`}
-                                    >
-                                      Save
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingDebtId(null);
-                                        setEditingInterestRate("");
-                                      }}
-                                      data-testid={`button-cancel-debt-${debt.id}`}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-gray-400">Click to edit interest rate</div>
-                                )}
-
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    deleteDebtMutation.mutate(debt.id);
-                                  }}
-                                  data-testid={`button-delete-debt-${debt.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">{t("results.dti")}</div>
-                        <div className="text-xl font-semibold text-gray-900">{debtMetrics.dti.toFixed(1)}%</div>
-                        <div className="text-xs text-gray-500">{debtMetrics.dtiCategory}</div>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Projected debt budget</div>
-                        <div className="text-xl font-semibold text-gray-900">
-                          ${formatCurrency(debtMetrics.totalDebtBudget)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Base payment: ${formatCurrency(debtMetrics.basePayment)} | Smallest debt: ${formatCurrency(debtMetrics.smallestDebtPayment)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border-4 border-cyan-500 bg-cyan-50 p-3 sm:p-4">
-                      <div className="rounded-md border-2 border-cyan-500 bg-white p-4">
-                        <div className="text-center">
-                          <div
-                            className="text-4xl leading-none text-gray-900 sm:text-5xl"
-                            style={{ fontFamily: "'Architects Daughter', cursive" }}
-                          >
-                            Free Printable
-                          </div>
-                          <h4 className="mt-3 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
-                            Debt Snowball Worksheet
-                          </h4>
-                          <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            {t("results.noInterest")}
-                          </p>
-                        </div>
-
-                        {debtPlan.months.length === 0 ? (
-                          <div className="mt-4 text-sm text-gray-500">
-                            {t("results.noPlan")}
-                          </div>
-                        ) : (
-                          <>
-                            {debtPlan.monthsToDebtFree && debtPlan.monthsToDebtFree > 12 && (
-                              <div className="mt-4 text-sm font-semibold text-red-600">
-                                {t("results.debtFreeLong")}
-                              </div>
-                            )}
-                            <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
-                              <div>
-                                {debtPlan.monthsToHealthy
-                                  ? t("results.monthsHealthy", { months: debtPlan.monthsToHealthy })
-                                  : t("results.monthsHealthyNone")}
-                              </div>
-                              <div>
-                                {debtPlan.monthsToDebtFree
-                                  ? t("results.monthsDebtFree", { months: debtPlan.monthsToDebtFree })
-                                  : t("results.monthsDebtFreeNone")}
-                              </div>
-                            </div>
-
-                            <div className="mt-4 overflow-x-auto rounded border border-cyan-500">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className="border-b border-cyan-600 bg-white hover:bg-white">
-                                    <TableHead className="min-w-[180px] border-r border-cyan-600 text-left font-bold text-gray-800">
-                                      {t("results.debtLabel")}
-                                    </TableHead>
-                                    {debtPlan.months.slice(0, 6).map((month) => (
-                                      <TableHead
-                                        key={`month-${month.month}`}
-                                        className="min-w-[130px] border-r border-cyan-600 text-center font-bold text-gray-800 last:border-r-0"
-                                      >
-                                        {t("results.monthLabel", { month: month.month })}
-                                      </TableHead>
-                                    ))}
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {debts.map((debt, rowIndex) => (
-                                    <TableRow
-                                      key={debt.id}
-                                      className={rowIndex % 2 === 0 ? "bg-cyan-200/80 hover:bg-cyan-200/80" : "bg-white hover:bg-white"}
-                                    >
-                                      <TableCell className="border-r border-cyan-600 font-semibold text-gray-900">
-                                        {debt.name}
-                                      </TableCell>
-                                      {debtPlan.months.slice(0, 6).map((month) => {
-                                        const debtRow = month.debts.find((item) => item.id === debt.id);
-                                        const balanceBefore = debtRow?.balanceBefore ?? 0;
-                                        const payment = debtRow?.payment ?? 0;
-                                        const remainingAfter = Math.max(0, balanceBefore - payment);
-                                        const value = remainingAfter <= 0 ? t("results.paid") : `$${formatCurrency(remainingAfter)}`;
-                                        return (
-                                          <TableCell
-                                            key={`${debt.id}-${month.month}`}
-                                            className="border-r border-cyan-600 text-right font-medium text-gray-800 last:border-r-0"
-                                          >
-                                            {value}
-                                          </TableCell>
-                                        );
-                                      })}
-                                    </TableRow>
-                                  ))}
-                                  <TableRow className="border-t-2 border-cyan-600 bg-white font-bold hover:bg-white">
-                                    <TableCell className="border-r border-cyan-600 text-gray-900">
-                                      {t("results.totals")}
-                                    </TableCell>
-                                    {debtPlan.months.slice(0, 6).map((month) => (
-                                      <TableCell
-                                        key={`total-${month.month}`}
-                                        className="border-r border-cyan-600 text-right text-gray-900 last:border-r-0"
-                                      >
-                                        ${formatCurrency(month.totalBalance)}
-                                      </TableCell>
-                                    ))}
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <DebtDashboard monthlyIncome={monthlyIncome} />
             </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+        </Tabs>
+      </div>
+    </main>
+  );
+}
+
+function DashboardMetric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
+  return (
+    <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+      <CardContent className="p-5">
+        <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-white/10 text-amber-400">{icon}</div>
+        <div className="text-xs text-slate-400">{label}</div>
+        <div className="mt-1 truncate text-2xl font-semibold">{value}</div>
+        <div className="mt-1 truncate text-xs text-slate-500">{detail}</div>
+      </CardContent>
+    </Card>
   );
 }

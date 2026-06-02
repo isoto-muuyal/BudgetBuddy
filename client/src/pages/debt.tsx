@@ -1,52 +1,37 @@
-import { useEffect } from "react";
-import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useTranslation } from "react-i18next";
+import { WalletCards } from "lucide-react";
+import DebtDashboard from "@/components/debt-dashboard";
 
 export default function Debt() {
-  const [, setLocation] = useLocation();
-  const { t } = useTranslation();
-
-  const { data: analysisHistory, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/analysis"],
+  const { data: user } = useQuery<any>({
+    queryKey: ["/api/user/profile"],
   });
 
-  useEffect(() => {
-    if (!analysisHistory || analysisHistory.length === 0) return;
-    const latest = [...analysisHistory]
-      .filter((item) => item.analysisStatus === "completed")
-      .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())[0];
-
-    if (latest?.id) {
-      setLocation(`/results/${latest.id}?tab=debt`);
-    }
-  }, [analysisHistory, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="max-w-md mx-auto p-4 pt-8">
-        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
-          <CardContent className="p-8 text-center text-gray-600">
-            {t("debt.loading")}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const monthlyIncome = Number.parseFloat(user?.monthlyIncome || "0");
 
   return (
-    <div className="max-w-md mx-auto p-4 pt-8">
-      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
-        <CardContent className="p-8 text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">{t("debt.title")}</h2>
-          <p className="text-gray-600 mb-4">{t("debt.noAnalysis")}</p>
-          <Button onClick={() => setLocation("/upload")} className="bg-blue-400 text-white hover:bg-blue-600">
-            {t("debt.goUpload")}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-6 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[#202133] text-amber-400">
+              <WalletCards className="h-5 w-5" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-normal">Debt Management</h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-200">
+              Compare snowball, avalanche, and hybrid payoff plans using your balances, minimum payments, and APRs.
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-[#202133] px-4 py-3 text-right">
+            <div className="text-xs text-slate-400">Monthly income</div>
+            <div className="text-lg font-semibold">
+              ${monthlyIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+        </div>
+
+        <DebtDashboard monthlyIncome={monthlyIncome} />
+      </div>
+    </main>
   );
 }
