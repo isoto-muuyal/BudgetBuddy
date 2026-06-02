@@ -4,6 +4,8 @@ import { config } from "../config";
 import { storage } from "../storage";
 import { vectorStoreService } from "./vector-store-service";
 import { mcpClientService } from "./mcp-client-service";
+import { logger } from "./logger";
+import { metricsService } from "./metrics-service";
 
 export const CATEGORIZER_AGENT = "CATEGORIZER_AGENT";
 export const CATEGORIZER_TOOL = "CATEGORIZER_TOOL";
@@ -147,7 +149,8 @@ export class AIService {
 
       return result;
     } catch (error) {
-      console.error("Error in analyzeExpenses:", error);
+      metricsService.increment("ai_analysis_failures_total");
+      logger.error("AI analysis failed; using fallback", { error: this.errorMessage(error) });
       return this.fallbackRuleBasedAnalysis(textContent, monthlyIncome);
     }
   }
@@ -176,7 +179,8 @@ export class AIService {
 
       return this.parseRecommendationsResponse(response);
     } catch (error: any) {
-      console.error("History patterns AI failed:", error);
+      metricsService.increment("ai_tool_failures_total", { tool: "history_patterns" });
+      logger.error("History patterns AI failed", { error: this.errorMessage(error) });
       if (error.httpResponse) {
         console.error("HTTP error status:", error.httpResponse.status);
         console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
@@ -186,7 +190,7 @@ export class AIService {
   }
 
   private async runCategorizerAgent(textContent: string, monthlyIncome: number): Promise<CategorizedExpense[]> {
-    console.log(`${CATEGORIZER_AGENT}: preparing categorization request`);
+    logger.info("Preparing categorization request", { agent: CATEGORIZER_AGENT });
     return this.runCategorizerTool(textContent, monthlyIncome);
   }
 
@@ -195,7 +199,8 @@ export class AIService {
 
     try {
       if (mcpClientService.isEnabled()) {
-        console.log(`${CATEGORIZER_TOOL}: calling MCP`);
+        logger.info("Calling MCP categorizer tool", { tool: config.mcp.tools.categorizeTransactions });
+        metricsService.increment("ai_tool_requests_total", { tool: "categorize_transactions", provider: "mcp" });
         const response = await mcpClientService.callTool<McpCategorizationResponse | CategorizedExpense[]>(
           config.mcp.tools.categorizeTransactions,
           {
@@ -209,7 +214,8 @@ export class AIService {
         return this.normalizeExpenses(Array.isArray(expenses) ? expenses : []);
       }
 
-      console.log(`${CATEGORIZER_TOOL}: calling AI`);
+      logger.info("Calling AI categorizer tool", { provider: "huggingface" });
+      metricsService.increment("ai_tool_requests_total", { tool: "categorize_transactions", provider: "huggingface" });
       const responseText = await this.runJsonCompletion({
         systemPrompt:
           "You are a financial transaction categorization expert. Your task is to categorize expenses according to the 50/30/20 budgeting rule. Always return ONLY valid JSON. Do not invent or duplicate transactions. If uncertain, use 'undefined'.",
@@ -220,19 +226,20 @@ export class AIService {
 
       return this.parseCategorizationResponse(responseText);
     } catch (error: any) {
-      console.error(`${CATEGORIZER_TOOL} failed:`, error);
+      metricsService.increment("ai_tool_failures_total", { tool: "categorize_transactions" });
+      logger.error("Categorizer tool failed", { error: this.errorMessage(error) });
       if (error.httpResponse) {
         console.error("HTTP error status:", error.httpResponse.status);
         console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
       }
 
-      console.log(`${CATEGORIZER_TOOL}: falling back to rule-based categorization`);
+      logger.warn("Falling back to rule-based categorization", { tool: CATEGORIZER_TOOL });
       return this.ruleBasedCategorization(textContent);
     }
   }
 
   private async runAdvisorAgent(expenses: CategorizedExpense[], monthlyIncome: number): Promise<string> {
-    console.log(`${ADVISOR_AGENT}: preparing recommendations request`);
+    logger.info("Preparing recommendations request", { agent: ADVISOR_AGENT });
     return this.runAdvisorTool(expenses, monthlyIncome);
   }
 
@@ -241,7 +248,8 @@ export class AIService {
 
     try {
       if (mcpClientService.isEnabled()) {
-        console.log(`${ADVISOR_TOOL}: calling MCP`);
+        logger.info("Calling MCP recommendations tool", { tool: config.mcp.tools.generateBudgetRecommendations });
+        metricsService.increment("ai_tool_requests_total", { tool: "generate_budget_recommendations", provider: "mcp" });
         const totals = this.calculateTotalsFromExpenses(expenses);
         const response = await mcpClientService.callTool<string | McpRecommendationsResponse>(
           config.mcp.tools.generateBudgetRecommendations,
@@ -260,7 +268,8 @@ export class AIService {
         return this.extractMcpText(response, "recommendations");
       }
 
-      console.log(`${ADVISOR_TOOL}: calling AI`);
+      logger.info("Calling AI recommendations tool", { provider: "huggingface" });
+      metricsService.increment("ai_tool_requests_total", { tool: "generate_budget_recommendations", provider: "huggingface" });
       const responseText = await this.runTextCompletion({
         systemPrompt:
           "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. Provide detailed, actionable recommendations based on the categorized expenses.",
@@ -271,13 +280,14 @@ export class AIService {
 
       return this.parseRecommendationsResponse(responseText);
     } catch (error: any) {
-      console.error(`${ADVISOR_TOOL} failed:`, error);
+      metricsService.increment("ai_tool_failures_total", { tool: "generate_budget_recommendations" });
+      logger.error("Advisor tool failed", { error: this.errorMessage(error) });
       if (error.httpResponse) {
         console.error("HTTP error status:", error.httpResponse.status);
         console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
       }
 
-      console.log(`${ADVISOR_TOOL}: falling back to rule-based recommendations`);
+      logger.warn("Falling back to rule-based recommendations", { tool: ADVISOR_TOOL });
       return this.ruleBasedRecommendations(expenses, monthlyIncome);
     }
   }
@@ -295,7 +305,7 @@ export class AIService {
       undefined: number;
     };
   }): Promise<GlobalAdviceResult> {
-    console.log(`${GLOBAL_ADVISOR_AGENT}: building historical context`);
+    logger.info("Building global advisor historical context", { agent: GLOBAL_ADVISOR_AGENT });
 
     const currentSummary = this.buildAnalysisSummary({
       monthlyIncome: input.monthlyIncome,
@@ -401,7 +411,8 @@ export class AIService {
 
     try {
       if (mcpClientService.isEnabled()) {
-        console.log(`${GLOBAL_ADVISOR_TOOL}: calling MCP`);
+        logger.info("Calling MCP global advisor tool", { tool: config.mcp.tools.generateGlobalAdvice });
+        metricsService.increment("ai_tool_requests_total", { tool: "generate_global_advice", provider: "mcp" });
         const response = await mcpClientService.callTool<GlobalAdviceResponse>(
           config.mcp.tools.generateGlobalAdvice,
           {
@@ -422,7 +433,8 @@ export class AIService {
         };
       }
 
-      console.log(`${GLOBAL_ADVISOR_TOOL}: calling AI`);
+      logger.info("Calling AI global advisor tool", { provider: "huggingface" });
+      metricsService.increment("ai_tool_requests_total", { tool: "generate_global_advice", provider: "huggingface" });
       const responseText = await this.runJsonCompletion({
         systemPrompt:
           "You are a financial progress analyst. Compare the current budget analysis against prior analyses and return ONLY JSON with a progressStatus and a three-line advice summary.",
@@ -436,7 +448,8 @@ export class AIService {
         input.similarAnalyses.map((analysis) => analysis.analysisId)
       );
     } catch (error: any) {
-      console.error(`${GLOBAL_ADVISOR_TOOL} failed:`, error);
+      metricsService.increment("ai_tool_failures_total", { tool: "generate_global_advice" });
+      logger.error("Global advisor tool failed", { error: this.errorMessage(error) });
       if (error.httpResponse) {
         console.error("HTTP error status:", error.httpResponse.status);
         console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
@@ -651,9 +664,13 @@ Keep the response concise and actionable with bullet points.
       const filePath = `./failed_ai_responses/categorization_${timestamp}.txt`;
       fs.mkdirSync("./failed_ai_responses", { recursive: true });
       fs.writeFileSync(filePath, responseText);
-      console.error("Failed to parse categorization response:", error);
+      logger.error("Failed to parse categorization response", { error: this.errorMessage(error), filePath });
       throw error;
     }
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private parseGlobalAdviceResponse(responseText: string, supportingAnalysisIds: string[]): GlobalAdviceResult {

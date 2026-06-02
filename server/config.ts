@@ -39,6 +39,15 @@ export const config = {
       generateGlobalAdvice: process.env.MCP_TOOL_GENERATE_GLOBAL_ADVICE || "generate_global_advice",
     },
   },
+  observability: {
+    serviceName: process.env.OTEL_SERVICE_NAME || process.env.SERVICE_NAME || "budgetbuddy-api",
+    environment: process.env.OBSERVABILITY_ENV || process.env.NODE_ENV || "development",
+    metricsPath: process.env.PROMETHEUS_METRICS_PATH || "/metrics",
+    metricsBearerToken: process.env.PROMETHEUS_METRICS_BEARER_TOKEN || "",
+    lokiUrl: process.env.GRAFANA_LOKI_URL || process.env.LOKI_URL || "",
+    lokiUsername: process.env.GRAFANA_LOKI_USERNAME || process.env.LOKI_USERNAME || "",
+    lokiPassword: process.env.GRAFANA_LOKI_PASSWORD || process.env.LOKI_PASSWORD || "",
+  },
   jwt: {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",

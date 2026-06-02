@@ -15,6 +15,8 @@ import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
+import { logger } from "./services/logger";
+import { metricsService } from "./services/metrics-service";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -239,7 +241,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = await fileProcessor.saveFile(req.file.buffer || await fs.readFile(req.file.path), fileName);
 
       // Create budget analysis record
-      console.log('!!! originalname:', req.file.originalname);
+      logger.info("Analysis upload accepted", {
+        traceId: req.traceId,
+        userId: user.id,
+        originalFileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      });
       const monthlyIncome = parseFloat(user.monthlyIncome);
       const analysis = await storage.createBudgetAnalysis({
         userId: user.id,
@@ -259,7 +267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         analysisId: analysis.id,
       });
     } catch (error: any) {
-      console.error("Upload error:", error);
+      metricsService.increment("analysis_upload_failures_total");
+      logger.error("Upload failed", { traceId: req.traceId, error: error instanceof Error ? error.message : String(error) });
       res.status(500).json({ message: error.message });
     }
   });
@@ -327,9 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const analysisId = req.params.id;
-      console.log("Analysis ID: " + analysisId);
       const analysis = await storage.getBudgetAnalysis(analysisId);
-      console.log("Analysis: " + analysis);
 
       if (!analysis) {
         return res.status(404).json({ message: "Analysis not found" });
@@ -472,7 +479,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 // Async file processing function
 async function processFileAsync(userId: string, analysisId: string, filePath: string, monthlyIncome: number) {
+  const started = Date.now();
   try {
+    logger.info("Analysis processing started", { userId, analysisId });
+    metricsService.increment("analysis_jobs_started_total");
 
     // Extract text from file
     const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
@@ -483,7 +493,12 @@ async function processFileAsync(userId: string, analysisId: string, filePath: st
       analysisId,
       runGlobalAdvisor: true,
     });
-    console.log(`AI analysis result for ${analysisId}:`, aiResult);
+    logger.info("AI analysis completed", {
+      userId,
+      analysisId,
+      expenseCount: aiResult.expenses.length,
+      hasGlobalAdvice: Boolean(aiResult.globalAdvice),
+    });
 
     // Update analysis with results
     await storage.updateBudgetAnalysis(analysisId, {
@@ -496,9 +511,18 @@ async function processFileAsync(userId: string, analysisId: string, filePath: st
       analysisStatus: "completed",
     });
 
-    console.log(`Analysis completed for ${analysisId}`);
+    metricsService.increment("analysis_jobs_completed_total");
+    metricsService.observe("analysis_job_duration_seconds", { status: "completed" }, (Date.now() - started) / 1000, [1, 5, 10, 30, 60, 120, 300, 600]);
+    logger.info("Analysis processing completed", { userId, analysisId, durationMs: Date.now() - started });
   } catch (error) {
-    console.error(`Analysis failed for ${analysisId}:`, error);
+    metricsService.increment("analysis_jobs_failed_total");
+    metricsService.observe("analysis_job_duration_seconds", { status: "failed" }, (Date.now() - started) / 1000, [1, 5, 10, 30, 60, 120, 300, 600]);
+    logger.error("Analysis processing failed", {
+      userId,
+      analysisId,
+      durationMs: Date.now() - started,
+      error: error instanceof Error ? error.message : String(error),
+    });
     
     // Update analysis with error status
     await storage.updateBudgetAnalysis(analysisId, {
