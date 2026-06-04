@@ -82,7 +82,7 @@
 
   body {
     @apply font-sans antialiased text-foreground min-h-screen;
-    background: linear-gradient(135deg, hsl(210 50% 98%), hsl(262 68% 96%));
+    background: #5b5c67;
   }
   .dark body {
     background: linear-gradient(135deg, hsl(224 60% 8%), hsl(224 50% 12%));

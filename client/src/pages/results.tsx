@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Bot, Download, Upload, FileText, Calendar, Loader2, Wallet, TrendingUp, Target } from "lucide-react";
+import { Bot, Download, Upload, FileText, Calendar, Loader2, Wallet, TrendingUp, Target, HandCoins } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Area, AreaChart } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -244,7 +244,7 @@ export default function Results({ params }: ResultsProps) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[#202133] text-amber-400">
-              <BarChart3 className="h-5 w-5" />
+              <HandCoins className="h-5 w-5" />
             </div>
             <h2 className="text-2xl font-semibold tracking-normal" data-testid="text-results-title">
               {t("results.title")}
@@ -331,173 +331,191 @@ export default function Results({ params }: ResultsProps) {
 
         <Tabs defaultValue={defaultTab} className="mt-6">
             <TabsList className="grid w-full grid-cols-3 bg-[#202133] text-slate-300">
-              <TabsTrigger value="analysis">{t("results.title")}</TabsTrigger>
-              <TabsTrigger value="history">{t("results.history")}</TabsTrigger>
-              <TabsTrigger value="debt">{t("results.debtPlan")}</TabsTrigger>
+              <TabsTrigger className="data-[state=active]:bg-white/10 data-[state=active]:text-white" value="analysis">{t("results.title")}</TabsTrigger>
+              <TabsTrigger className="data-[state=active]:bg-white/10 data-[state=active]:text-white" value="history">{t("results.history")}</TabsTrigger>
+              <TabsTrigger className="data-[state=active]:bg-white/10 data-[state=active]:text-white" value="debt">{t("results.debtPlan")}</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="analysis">
+            <TabsContent value="analysis" className="space-y-5">
               {/* Current vs Recommended Comparison */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">{t("results.current")}</h3>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-base">{t("results.current")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   {isProcessing ? (
                     <div className="space-y-2">
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex items-center justify-center py-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin text-amber-400" />
+                          <span className="text-sm text-slate-300">{t("results.analyzing")}</span>
                         </div>
                       </div>
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex items-center justify-center py-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin text-amber-400" />
+                          <span className="text-sm text-slate-300">{t("results.analyzing")}</span>
                         </div>
                       </div>
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex items-center justify-center py-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-blue-600 mr-2" />
-                          <span className="text-sm text-blue-800">{t("results.analyzing")}</span>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin text-amber-400" />
+                          <span className="text-sm text-slate-300">{t("results.analyzing")}</span>
                         </div>
                       </div>
                     </div>
                   ) : hasFailed ? (
-                    <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                      <p className="text-sm text-red-800 text-center">{t("results.failed")}</p>
+                    <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-4">
+                      <p className="text-center text-sm text-red-200">{t("results.failed")}</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-red-800">{t("results.needs")}</span>
-                          <span className="font-semibold text-red-800" data-testid="text-actual-needs-percent">
+                          <span className="text-sm text-slate-300">{t("results.needs")}</span>
+                          <span className="font-semibold text-emerald-300" data-testid="text-actual-needs-percent">
                             {analysis.actualNeeds ? `${actualNeedsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
-                        <div className="text-xs text-red-600" data-testid="text-actual-needs-amount">
+                        <div className="text-xs text-slate-500" data-testid="text-actual-needs-amount">
                           {analysis.actualNeeds ? `$${analysis.actualNeeds}` : t("results.calculating")}
                         </div>
                       </div>
-                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-orange-800">{t("results.wants")}</span>
-                          <span className="font-semibold text-orange-800" data-testid="text-actual-wants-percent">
+                          <span className="text-sm text-slate-300">{t("results.wants")}</span>
+                          <span className="font-semibold text-sky-300" data-testid="text-actual-wants-percent">
                             {analysis.actualWants ? `${actualWantsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
-                        <div className="text-xs text-orange-600" data-testid="text-actual-wants-amount">
+                        <div className="text-xs text-slate-500" data-testid="text-actual-wants-amount">
                           {analysis.actualWants ? `$${analysis.actualWants}` : t("results.calculating")}
                         </div>
                       </div>
-                      <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                      <div className="rounded-lg border border-white/10 bg-[#171827] p-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-red-800">{t("results.savings")}</span>
-                          <span className="font-semibold text-red-800" data-testid="text-actual-savings-percent">
+                          <span className="text-sm text-slate-300">{t("results.savings")}</span>
+                          <span className="font-semibold text-amber-300" data-testid="text-actual-savings-percent">
                             {analysis.actualSavings ? `${actualSavingsPercent}%` : t("results.calculating")}
                           </span>
                         </div>
-                        <div className="text-xs text-red-600" data-testid="text-actual-savings-amount">
+                        <div className="text-xs text-slate-500" data-testid="text-actual-savings-amount">
                           {analysis.actualSavings ? `$${analysis.actualSavings}` : t("results.calculating")}
                         </div>
                       </div>
                     </div>
                   )}
-                </div>
+                  </CardContent>
+                </Card>
 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 mb-3 text-center">{t("results.recommended")}</h3>
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-base">{t("results.recommended")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   <div className="space-y-2">
-                    <div className="needs-bg p-3 rounded-lg border">
+                    <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-3">
                       <div className="flex justify-between">
-                        <span className="text-sm needs-text">{t("results.needs")}</span>
-                        <span className="font-semibold needs-text">50%</span>
+                        <span className="text-sm text-emerald-200">{t("results.needs")}</span>
+                        <span className="font-semibold text-emerald-200">50%</span>
                       </div>
-                      <div className="text-xs text-gray-600">${analysis.recommendedNeeds}</div>
+                      <div className="text-xs text-slate-400">${analysis.recommendedNeeds}</div>
                     </div>
-                    <div className="wants-bg p-3 rounded-lg border">
+                    <div className="rounded-lg border border-sky-400/20 bg-sky-400/10 p-3">
                       <div className="flex justify-between">
-                        <span className="text-sm wants-text">{t("results.wants")}</span>
-                        <span className="font-semibold wants-text">30%</span>
+                        <span className="text-sm text-sky-200">{t("results.wants")}</span>
+                        <span className="font-semibold text-sky-200">30%</span>
                       </div>
-                      <div className="text-xs text-gray-600">${analysis.recommendedWants}</div>
+                      <div className="text-xs text-slate-400">${analysis.recommendedWants}</div>
                     </div>
-                    <div className="savings-bg p-3 rounded-lg border">
+                    <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-3">
                       <div className="flex justify-between">
-                        <span className="text-sm savings-text">{t("results.savings")}</span>
-                        <span className="font-semibold savings-text">20%</span>
+                        <span className="text-sm text-amber-200">{t("results.savings")}</span>
+                        <span className="font-semibold text-amber-200">20%</span>
                       </div>
-                      <div className="text-xs text-gray-600">${analysis.recommendedSavings}</div>
+                      <div className="text-xs text-slate-400">${analysis.recommendedSavings}</div>
                     </div>
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* AI Recommendations */}
               {isProcessing && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <Bot className="text-brand-blue mr-2" />
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardContent className="p-6">
+                  <h3 className="mb-3 flex items-center font-semibold text-white">
+                    <Bot className="mr-2 text-amber-400" />
                     {t("results.recommendations")}
                   </h3>
-                  <div className="flex items-center text-sm text-gray-700">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <div className="flex items-center text-sm text-slate-300">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t("results.recommendationsLoading")}
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
               )}
               {!isProcessing && analysis.recommendations && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 mb-6">
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-900 flex items-center">
-                      <Bot className="text-brand-blue mr-2" />
+                    <h3 className="flex items-center font-semibold text-white">
+                      <Bot className="mr-2 text-amber-400" />
                       {t("results.recommendations")}
                     </h3>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleDownloadRecommendations}
+                      className="border-white/10 bg-transparent text-white hover:bg-white/10"
                       data-testid="button-download-recommendations"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {t("results.downloadRecs")}
                     </Button>
                   </div>
-                  <div className="text-sm text-gray-700 whitespace-pre-line" data-testid="text-recommendations">
+                  <div className="whitespace-pre-line text-sm text-slate-300" data-testid="text-recommendations">
                     {analysis.recommendations}
                   </div>
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Detailed Expense Breakdown */}
               {isProcessing && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">{t("results.breakdown")}</h3>
-                  <div className="bg-gray-50 p-6 rounded-lg text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">{t("results.processing")}</p>
-                  </div>
-                </div>
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-base">{t("results.breakdown")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-amber-400" />
+                    <p className="text-sm text-slate-300">{t("results.processing")}</p>
+                  </CardContent>
+                </Card>
               )}
               {!isProcessing && analysis.expenses && analysis.expenses.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">{t("results.breakdown")}</h3>
+                <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-base">{t("results.breakdown")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   <ScrollArea className="h-60" data-testid="scroll-expenses">
                     <div className="space-y-3">
                       {analysis.expenses.map((expense: any, index: number) => (
                         <div
                           key={index}
-                          className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                          className="flex items-center justify-between rounded-lg border border-white/10 bg-[#171827] p-3"
                           data-testid={`expense-${index}`}
                         >
                           <div>
-                            <div className="font-medium text-gray-900">{expense.description}</div>
+                            <div className="font-medium text-slate-100">{expense.description}</div>
                             {expense.subcategory && (
-                              <div className="text-xs text-gray-500">{expense.subcategory}</div>
+                              <div className="text-xs text-slate-500">{expense.subcategory}</div>
                             )}
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-gray-900">
+                            <div className="font-semibold text-slate-100">
                               {expense.amount < 0 ? "-" : "+"}${Math.abs(expense.amount).toFixed(2)}
                             </div>
                             {getCategoryBadge(expense.category)}
@@ -506,14 +524,15 @@ export default function Results({ params }: ResultsProps) {
                       ))}
                     </div>
                   </ScrollArea>
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               <div className="flex space-x-3">
                 <Button
                   onClick={() => setLocation("/upload")}
                   variant="outline"
-                  className="flex-1 py-3 rounded-lg font-medium"
+                  className="flex-1 rounded-lg border-white/10 bg-[#202133] py-3 font-medium text-white hover:bg-white/10"
                   data-testid="button-upload-new"
                 >
                   <Upload className="w-4 h-4 mr-2" />
@@ -522,7 +541,7 @@ export default function Results({ params }: ResultsProps) {
                 <Button
                   onClick={handleDownloadReport}
                   disabled={isGeneratingPDF || !userProfile || isProcessing}
-                  className="flex-1 bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 rounded-lg bg-amber-500 py-3 font-medium text-slate-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid="button-download"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -532,25 +551,25 @@ export default function Results({ params }: ResultsProps) {
             </TabsContent>
 
             <TabsContent value="history">
-              <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-history">
+              <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-history">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
-                    <FileText className="mr-2 text-blue-500" />
+                  <CardTitle className="flex items-center text-base">
+                    <FileText className="mr-2 text-amber-400" />
                     {t("results.history")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {patternsLoading ? (
-                    <div className="mb-4 bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center text-sm text-gray-600">
+                    <div className="mb-4 rounded-lg border border-white/10 bg-[#171827] p-4">
+                      <div className="flex items-center text-sm text-slate-300">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         {t("results.patternsLoading")}
                       </div>
                     </div>
                   ) : historyPatterns?.patterns ? (
-                    <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-2">{t("results.patterns")}</h4>
-                      <div className="text-sm text-gray-700 whitespace-pre-line">
+                    <div className="mb-4 rounded-lg border border-white/10 bg-[#171827] p-4">
+                      <h4 className="mb-2 font-semibold text-white">{t("results.patterns")}</h4>
+                      <div className="whitespace-pre-line text-sm text-slate-300">
                         {historyPatterns.patterns}
                       </div>
                     </div>
@@ -563,8 +582,8 @@ export default function Results({ params }: ResultsProps) {
                       ))}
                     </div>
                   ) : !analysisHistory || analysisHistory.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                    <div className="py-8 text-center text-slate-400">
+                      <FileText className="mx-auto mb-4 h-12 w-12 text-slate-600" />
                       <p>{t("results.historyNone")}</p>
                       <p className="text-sm">{t("results.historyHint")}</p>
                     </div>
@@ -572,14 +591,14 @@ export default function Results({ params }: ResultsProps) {
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[200px]">{t("history.fileName")}</TableHead>
-                            <TableHead>{t("history.uploadDate")}</TableHead>
-                            <TableHead>{t("history.status")}</TableHead>
-                            <TableHead className="text-right">{t("history.needs")}</TableHead>
-                            <TableHead className="text-right">{t("history.wants")}</TableHead>
-                            <TableHead className="text-right">{t("history.savings")}</TableHead>
-                            <TableHead className="w-[100px]">{t("history.action")}</TableHead>
+                          <TableRow className="border-white/10 hover:bg-transparent">
+                            <TableHead className="w-[200px] text-slate-300">{t("history.fileName")}</TableHead>
+                            <TableHead className="text-slate-300">{t("history.uploadDate")}</TableHead>
+                            <TableHead className="text-slate-300">{t("history.status")}</TableHead>
+                            <TableHead className="text-right text-slate-300">{t("history.needs")}</TableHead>
+                            <TableHead className="text-right text-slate-300">{t("history.wants")}</TableHead>
+                            <TableHead className="text-right text-slate-300">{t("history.savings")}</TableHead>
+                            <TableHead className="w-[100px] text-slate-300">{t("history.action")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -588,19 +607,19 @@ export default function Results({ params }: ResultsProps) {
                             .map((historyItem) => (
                               <TableRow 
                                 key={historyItem.id} 
-                                className={historyItem.id === analysisId ? "bg-blue-50" : ""}
+                                className={historyItem.id === analysisId ? "border-white/10 bg-white/10 hover:bg-white/10" : "border-white/10 hover:bg-white/5"}
                                 data-testid={`history-row-${historyItem.id}`}
                               >
-                                <TableCell className="font-medium">
+                                <TableCell className="font-medium text-slate-100">
                                   <div className="flex items-center">
-                                    <FileText className="mr-2 h-4 w-4 text-gray-400" />
+                                    <FileText className="mr-2 h-4 w-4 text-slate-500" />
                                     <span className="truncate max-w-[150px]" title={historyItem.originalFileName}>
                                       {historyItem.originalFileName}
                                     </span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex items-center text-sm text-gray-600">
+                                  <div className="flex items-center text-sm text-slate-400">
                                     <Calendar className="mr-1 h-3 w-3" />
                                     {new Date(historyItem.uploadDate).toLocaleDateString()}
                                   </div>
@@ -619,13 +638,13 @@ export default function Results({ params }: ResultsProps) {
                                     {getStatusLabel(historyItem.analysisStatus)}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right text-slate-100">
                                   {historyItem.actualNeeds ? `$${parseFloat(historyItem.actualNeeds).toFixed(0)}` : "-"}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right text-slate-100">
                                   {historyItem.actualWants ? `$${parseFloat(historyItem.actualWants).toFixed(0)}` : "-"}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right text-slate-100">
                                   {historyItem.actualSavings ? `$${parseFloat(historyItem.actualSavings).toFixed(0)}` : "-"}
                                 </TableCell>
                                 <TableCell>
@@ -633,6 +652,7 @@ export default function Results({ params }: ResultsProps) {
                                     <Button
                                       variant="outline"
                                       size="sm"
+                                      className="border-white/10 bg-transparent text-white hover:bg-white/10"
                                       onClick={() => setLocation(`/results/${historyItem.id}`)}
                                       data-testid={`button-view-${historyItem.id}`}
                                     >

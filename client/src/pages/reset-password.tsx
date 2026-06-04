@@ -74,36 +74,39 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="max-w-md mx-auto p-4 pt-8">
-        <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+      <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-8">
+      <div className="max-w-md mx-auto">
+        <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
           <CardContent className="p-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("reset.invalidTitle")}</h2>
-              <p className="text-gray-600 mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">{t("reset.invalidTitle")}</h2>
+              <p className="text-slate-300 mb-6">
                 {t("reset.invalidDesc")}
               </p>
-              <Link href="/forgot-password" className="text-brand-blue hover:text-brand-dark font-medium">
+              <Link href="/forgot-password" className="font-medium text-amber-300 hover:text-amber-200">
                 {t("reset.requestLink")}
               </Link>
             </div>
           </CardContent>
         </Card>
       </div>
+      </main>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 pt-8">
-      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-reset-password">
+    <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-8">
+    <div className="max-w-md mx-auto">
+      <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-reset-password">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <div className="gradient-brand w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="text-white text-2xl" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-white/10 text-amber-400">
+              <Lock className="h-8 w-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-reset-password-title">
+            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-reset-password-title">
               {t("reset.title")}
             </h2>
-            <p className="text-gray-600" data-testid="text-reset-password-description">
+            <p className="text-slate-300" data-testid="text-reset-password-description">
               {resetSuccess
                 ? t("reset.successDesc")
                 : t("reset.description")}
@@ -118,21 +121,21 @@ export default function ResetPassword() {
                   name="newPassword"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("reset.password")}</FormLabel>
+                      <FormLabel className="text-slate-300">{t("reset.password")}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
                             placeholder={t("reset.password")}
-                            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all"
+                            className="w-full rounded-lg border border-white/10 bg-[#171827] px-4 py-3 pr-12 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-400"
                             data-testid="input-password"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                           >
@@ -147,7 +150,7 @@ export default function ResetPassword() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-blue-400 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                  className="w-full rounded-lg bg-amber-500 py-3 font-medium text-slate-950 hover:bg-amber-400 transition-colors"
                   disabled={resetPasswordMutation.isPending}
                   data-testid="button-submit"
                 >
@@ -157,19 +160,20 @@ export default function ResetPassword() {
             </Form>
           ) : (
             <div className="text-center space-y-4">
-              <p className="text-gray-600" data-testid="text-reset-success">
+              <p className="text-slate-300" data-testid="text-reset-success">
                 {t("reset.redirecting")}
               </p>
             </div>
           )}
 
           <div className="text-center mt-6">
-            <Link href="/login" className="text-brand-blue hover:text-brand-dark font-medium" data-testid="link-back-to-login">
+            <Link href="/login" className="font-medium text-amber-300 hover:text-amber-200" data-testid="link-back-to-login">
               {t("reset.back")}
             </Link>
           </div>
         </CardContent>
       </Card>
     </div>
+    </main>
   );
 }

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { PieChart, LogIn, LogOut, Coffee, Moon, Sun, Globe } from "lucide-react";
+import { HandCoins, LogIn, LogOut, Coffee, Moon, Sun, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAuthToken, removeAuthToken } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
@@ -31,7 +31,7 @@ export default function Navigation() {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="border-b border-white/10 bg-[#202133] shadow-sm">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
@@ -40,22 +40,22 @@ export default function Navigation() {
               className="flex items-center space-x-2"
               data-testid="link-home"
             >
-            <PieChart className="text-2xl text-brand-blue" />
-              <span className="text-xl font-bold gradient-brand-text">{t("appName")}</span>
+            <HandCoins className="text-2xl text-amber-400" />
+              <span className="text-xl font-bold text-white">{t("appName")}</span>
             </Link>
 
             {isAuthenticated && (
               <div className="hidden md:flex items-center space-x-4">
                 <Link
                   href="/income"
-                  className="text-sm font-medium text-gray-700 hover:text-brand-blue transition-colors"
+                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
                   data-testid="link-budget-analysis"
                 >
                   {t("nav.budgetAnalysis")}
                 </Link>
                 <Link
                   href="/debt"
-                  className="text-sm font-medium text-gray-700 hover:text-brand-blue transition-colors"
+                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
                   data-testid="link-debt-management"
                 >
                   {t("nav.debtManagement")}
@@ -66,13 +66,13 @@ export default function Navigation() {
           
           {isAuthPage && (
             <div className="hidden md:flex items-center space-x-4">
-              <Link href="/about" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-about">
+              <Link href="/about" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-about">
                 {t("nav.about")}
               </Link>
-              <Link href="/terms" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-terms">
+              <Link href="/terms" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-terms">
                 {t("nav.terms")}
               </Link>
-              <Link href="/privacy" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-privacy">
+              <Link href="/privacy" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-privacy">
                 {t("nav.privacy")}
               </Link>
               <a 
@@ -115,7 +115,7 @@ export default function Navigation() {
               </DropdownMenu>
               {!isAuthenticated ? (
                 <Link href="/login" data-testid="button-login">
-                  <Button className="gradient-brand text-white hover:opacity-90 transition-opacity">
+                  <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors">
                     <LogIn className="w-4 h-4 mr-2" />
                     {t("nav.login")}
                   </Button>
@@ -124,7 +124,7 @@ export default function Navigation() {
                 <Button 
                   onClick={handleLogout}
                   variant="outline"
-                  className="border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
+                  className="border-white/10 bg-transparent text-white hover:bg-white/10 transition-colors"
                   data-testid="button-logout"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -136,13 +136,13 @@ export default function Navigation() {
 
           {!isAuthPage && isAuthenticated && (
             <div className="hidden md:flex items-center space-x-4">
-              <Link href="/about" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-about">
+              <Link href="/about" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-about">
                 {t("nav.about")}
               </Link>
-              <Link href="/terms" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-terms">
+              <Link href="/terms" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-terms">
                 {t("nav.terms")}
               </Link>
-              <Link href="/privacy" className="text-gray-600 hover:text-brand-blue transition-colors" data-testid="link-privacy">
+              <Link href="/privacy" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-privacy">
                 {t("nav.privacy")}
               </Link>
               <a 
@@ -186,7 +186,7 @@ export default function Navigation() {
               <Button 
                 onClick={handleLogout}
                 variant="outline"
-                className="border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
+                className="border-white/10 bg-transparent text-white hover:bg-white/10 transition-colors"
                 data-testid="button-logout"
               >
                 <LogOut className="w-4 h-4 mr-2" />

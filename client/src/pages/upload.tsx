@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { Upload, CloudUpload } from "lucide-react";
+import { HandCoins, CloudUpload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -106,33 +106,34 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="w-[70vw] mx-auto p-4 pt-8">
-      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-upload">
+    <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-8">
+    <div className="mx-auto max-w-4xl">
+      <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-upload">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <div className="bg-gradient-to-r from-indigo-400 to-brand-purple w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className="text-white text-2xl" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-white/10 text-amber-400">
+              <HandCoins className="h-8 w-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-upload-title">
+            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-upload-title">
               {t("upload.title")}
             </h2>
-            <p className="text-gray-600" data-testid="text-upload-description">
+            <p className="text-slate-300" data-testid="text-upload-description">
               {t("upload.description")}
             </p>
           </div>
 
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-brand-blue transition-colors cursor-pointer"
+            className="cursor-pointer rounded-lg border-2 border-dashed border-white/10 bg-[#171827] p-8 text-center transition-colors hover:border-amber-400/60"
             onClick={() => document.getElementById('file-input')?.click()}
             data-testid="dropzone-upload"
           >
             <div className="space-y-4">
-              <CloudUpload className="text-4xl text-gray-400 mx-auto" />
+              <CloudUpload className="mx-auto h-10 w-10 text-slate-500" />
               <div>
-                <p className="text-lg font-medium text-gray-900">{t("upload.dropTitle")}</p>
-                <p className="text-sm text-gray-500">{t("upload.dropSubtitle")}</p>
+                <p className="text-lg font-medium text-white">{t("upload.dropTitle")}</p>
+                <p className="text-sm text-slate-400">{t("upload.dropSubtitle")}</p>
               </div>
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-slate-500">
                 {t("upload.supports")}
               </div>
             </div>
@@ -148,12 +149,12 @@ export default function UploadPage() {
 
           <div className="mt-6 space-y-4">
             {selectedFile && (
-              <div className="bg-gray-50 p-4 rounded-lg" data-testid="card-upload-progress">
+              <div className="rounded-lg border border-white/10 bg-[#171827] p-4" data-testid="card-upload-progress">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700" data-testid="text-filename">
+                  <span className="text-sm font-medium text-slate-200" data-testid="text-filename">
                     {selectedFile.name}
                   </span>
-                  <span className="text-sm text-gray-500" data-testid="text-upload-status">
+                  <span className="text-sm text-slate-400" data-testid="text-upload-status">
                     {uploadProgress < 100 ? t("upload.uploadStatus") : t("upload.readyStatus")}
                   </span>
                 </div>
@@ -166,8 +167,8 @@ export default function UploadPage() {
               disabled={!selectedFile || uploadProgress < 100 || uploadMutation.isPending}
               className={`w-full py-3 rounded-lg font-medium transition-all ${
                 selectedFile && uploadProgress >= 100 && !uploadMutation.isPending
-                  ? "bg-gradient-to-r from-green-400 to-blue-500 text-white hover:opacity-90 hover:shadow-lg"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
+                  : "bg-white/10 text-slate-500 cursor-not-allowed"
               }`}
               data-testid="button-analyze"
             >
@@ -177,5 +178,6 @@ export default function UploadPage() {
         </CardContent>
       </Card>
     </div>
+    </main>
   );
 }

@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Chrome, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Chrome, HandCoins, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -54,17 +54,18 @@ export default function Signup() {
   };
 
   return (
-    <div className="max-w-md mx-auto p-4 pt-8">
-      <Card className="bg-white rounded-2xl shadow-xl border border-gray-100" data-testid="card-signup">
+    <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-8">
+    <div className="max-w-md mx-auto">
+      <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-signup">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <div className="bg-gradient-to-r from-brand-purple to-brand-blue w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <UserPlus className="text-white text-2xl" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-white/10 text-amber-400">
+              <HandCoins className="h-8 w-8" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" data-testid="text-signup-title">
+            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-signup-title">
               {t("signup.title")}
             </h2>
-            <p className="text-gray-600" data-testid="text-signup-description">
+            <p className="text-slate-300" data-testid="text-signup-description">
               {t("signup.description")}
             </p>
           </div>
@@ -76,13 +77,13 @@ export default function Signup() {
                 name="fullName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("signup.fullName")}</FormLabel>
+                    <FormLabel className="text-slate-300">{t("signup.fullName")}</FormLabel>
                     <FormControl>
                         <Input
                           {...field}
                           type="text"
                           placeholder={t("signup.fullName")}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
+                        className="w-full rounded-lg border border-white/10 bg-[#171827] px-4 py-3 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-400"
                         data-testid="input-fullname"
                       />
                     </FormControl>
@@ -96,13 +97,13 @@ export default function Signup() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("signup.email")}</FormLabel>
+                    <FormLabel className="text-slate-300">{t("signup.email")}</FormLabel>
                     <FormControl>
                         <Input
                           {...field}
                           type="email"
                           placeholder={t("signup.email")}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
+                        className="w-full rounded-lg border border-white/10 bg-[#171827] px-4 py-3 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-400"
                         data-testid="input-email"
                       />
                     </FormControl>
@@ -116,21 +117,21 @@ export default function Signup() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("signup.password")}</FormLabel>
+                    <FormLabel className="text-slate-300">{t("signup.password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
                           {...field}
                           type={showPassword ? "text" : "password"}
                           placeholder={t("signup.passwordPlaceholder")}
-                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all"
+                          className="w-full rounded-lg border border-white/10 bg-[#171827] px-4 py-3 pr-12 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-400"
                           data-testid="input-password"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                           onClick={() => setShowPassword(!showPassword)}
                           data-testid="button-toggle-password"
                         >
@@ -143,13 +144,13 @@ export default function Signup() {
                 )}
               />
 
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-slate-400">
                 {t("signup.termsNote")}
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-brand-purple to-brand-blue text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+                className="w-full rounded-lg bg-amber-500 py-3 font-medium text-slate-950 hover:bg-amber-400 transition-colors"
                 disabled={signupMutation.isPending}
                 data-testid="button-submit"
               >
@@ -159,14 +160,14 @@ export default function Signup() {
           </Form>
 
           <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">{t("common.or")}</span>
-            <div className="h-px flex-1 bg-gray-200" />
+            <div className="h-px flex-1 bg-white/10" />
+            <span className="text-xs text-slate-500">{t("common.or")}</span>
+            <div className="h-px flex-1 bg-white/10" />
           </div>
 
           <Button
             variant="outline"
-            className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+            className="w-full border border-white/10 bg-transparent text-white hover:bg-white/10"
             onClick={() => {
               window.location.href = "/api/auth/google";
             }}
@@ -177,13 +178,14 @@ export default function Signup() {
           </Button>
 
           <div className="text-center mt-6">
-            <span className="text-gray-600">{t("signup.haveAccount")} </span>
-            <Link href="/login" className="text-brand-purple hover:text-brand-dark font-medium" data-testid="link-login">
+            <span className="text-slate-300">{t("signup.haveAccount")} </span>
+            <Link href="/login" className="font-medium text-amber-300 hover:text-amber-200" data-testid="link-login">
               {t("signup.login")}
             </Link>
           </div>
         </CardContent>
       </Card>
     </div>
+    </main>
   );
 }
