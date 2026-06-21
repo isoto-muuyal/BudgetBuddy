@@ -59,6 +59,19 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensureRecurringExpensesTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS recurring_expenses (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        name text NOT NULL,
+        amount numeric(10,2) NOT NULL,
+        frequency text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  };
+
   const ensureAnalysisIntelligenceTables = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analysis_embeddings (
@@ -90,6 +103,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAppVersionsTable();
     await ensureAdminTable();
     await ensureAnalysisIntelligenceTables();
+    await ensureRecurringExpensesTable();
     return;
   }
 
@@ -105,6 +119,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAppVersionsTable();
       await ensureAdminTable();
       await ensureAnalysisIntelligenceTables();
+      await ensureRecurringExpensesTable();
       return;
     }
 
@@ -112,6 +127,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAppVersionsTable();
       await ensureAdminTable();
       await ensureAnalysisIntelligenceTables();
+      await ensureRecurringExpensesTable();
       console.log("app_versions and ADMIN tables ensured successfully.");
       return;
     }
@@ -135,6 +151,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         await ensureAdminTable();
       }
       await ensureAnalysisIntelligenceTables();
+      await ensureRecurringExpensesTable();
       console.log("Database schema created successfully.");
       return;
     }
@@ -203,6 +220,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAppVersionsTable();
     await ensureAdminTable();
     await ensureAnalysisIntelligenceTables();
+    await ensureRecurringExpensesTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);
