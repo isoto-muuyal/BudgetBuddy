@@ -48,6 +48,13 @@ export interface AnalysisAgentContext {
   userId?: string;
   analysisId?: string;
   runGlobalAdvisor?: boolean;
+  recurringExpenses?: RecurringExpenseReference[];
+}
+
+export interface RecurringExpenseReference {
+  name: string;
+  amount: number;
+  frequency: string;
 }
 
 interface CategorizedExpense {
@@ -123,8 +130,9 @@ export class AIService {
     context: AnalysisAgentContext = {}
   ): Promise<AIExpenseAnalysis> {
     try {
-      const expenses = await this.runCategorizerAgent(textContent, monthlyIncome);
-      const recommendations = await this.runAdvisorAgent(expenses, monthlyIncome);
+      const recurringExpenses = context.recurringExpenses ?? [];
+      const expenses = await this.runCategorizerAgent(textContent, monthlyIncome, recurringExpenses);
+      const recommendations = await this.runAdvisorAgent(expenses, monthlyIncome, recurringExpenses);
       const totals = this.calculateTotalsFromExpenses(expenses);
 
       const result: AIExpenseAnalysis = {
@@ -189,13 +197,21 @@ export class AIService {
     }
   }
 
-  private async runCategorizerAgent(textContent: string, monthlyIncome: number): Promise<CategorizedExpense[]> {
+  private async runCategorizerAgent(
+    textContent: string,
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): Promise<CategorizedExpense[]> {
     logger.info("Preparing categorization request", { agent: CATEGORIZER_AGENT });
-    return this.runCategorizerTool(textContent, monthlyIncome);
+    return this.runCategorizerTool(textContent, monthlyIncome, recurringExpenses);
   }
 
-  private async runCategorizerTool(textContent: string, monthlyIncome: number): Promise<CategorizedExpense[]> {
-    const prompt = this.buildCategorizationPrompt(textContent, monthlyIncome);
+  private async runCategorizerTool(
+    textContent: string,
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): Promise<CategorizedExpense[]> {
+    const prompt = this.buildCategorizationPrompt(textContent, monthlyIncome, recurringExpenses);
 
     try {
       if (mcpClientService.isEnabled()) {
@@ -206,6 +222,7 @@ export class AIService {
           {
             textContent,
             monthlyIncome,
+            recurringExpenses,
             ruleset: "50/30/20",
             categories: ["50%", "30%", "20%", "undefined"],
           }
@@ -238,13 +255,21 @@ export class AIService {
     }
   }
 
-  private async runAdvisorAgent(expenses: CategorizedExpense[], monthlyIncome: number): Promise<string> {
+  private async runAdvisorAgent(
+    expenses: CategorizedExpense[],
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): Promise<string> {
     logger.info("Preparing recommendations request", { agent: ADVISOR_AGENT });
-    return this.runAdvisorTool(expenses, monthlyIncome);
+    return this.runAdvisorTool(expenses, monthlyIncome, recurringExpenses);
   }
 
-  private async runAdvisorTool(expenses: CategorizedExpense[], monthlyIncome: number): Promise<string> {
-    const prompt = this.buildRecommendationsPrompt(expenses, monthlyIncome);
+  private async runAdvisorTool(
+    expenses: CategorizedExpense[],
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): Promise<string> {
+    const prompt = this.buildRecommendationsPrompt(expenses, monthlyIncome, recurringExpenses);
 
     try {
       if (mcpClientService.isEnabled()) {
@@ -256,6 +281,7 @@ export class AIService {
           {
             expenses,
             monthlyIncome,
+            recurringExpenses,
             totals,
             recommended: {
               needs: monthlyIncome * 0.5,
@@ -534,7 +560,20 @@ export class AIService {
     return categorized;
   }
 
-  private buildCategorizationPrompt(textContent: string, monthlyIncome: number): string {
+  private buildCategorizationPrompt(
+    textContent: string,
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): string {
+    const recurringSection = recurringExpenses.length
+      ? `
+Known Recurring Expenses (user-provided reference):
+${JSON.stringify(recurringExpenses, null, 2)}
+
+Use these recurring expenses as reference when matching and categorizing transactions from the statement.
+`
+      : "";
+
     return `
 You are categorizing financial transactions according to the 50/30/20 budgeting rule:
 
@@ -543,7 +582,7 @@ You are categorizing financial transactions according to the 50/30/20 budgeting 
 - 20% for SAVINGS: Money saved, invested, or put toward debt payments above minimums
 
 Monthly Income: $${monthlyIncome}
-
+${recurringSection}
 Bank Statement Content:
 ${textContent}
 
@@ -568,18 +607,30 @@ Important rules:
 `;
   }
 
-  private buildRecommendationsPrompt(expenses: CategorizedExpense[], monthlyIncome: number): string {
+  private buildRecommendationsPrompt(
+    expenses: CategorizedExpense[],
+    monthlyIncome: number,
+    recurringExpenses: RecurringExpenseReference[] = []
+  ): string {
     const totals = this.calculateTotalsFromExpenses(expenses);
     const recommendedNeeds = monthlyIncome * 0.5;
     const recommendedWants = monthlyIncome * 0.3;
     const recommendedSavings = monthlyIncome * 0.2;
     const divisor = monthlyIncome || 1;
+    const recurringSection = recurringExpenses.length
+      ? `
+Known Recurring Expenses (user-provided reference):
+${JSON.stringify(recurringExpenses, null, 2)}
+
+Compare actual spending against these expected recurring expenses when making recommendations.
+`
+      : "";
 
     return `
 You are analyzing a user's spending patterns based on the 50/30/20 budgeting rule.
 
 Monthly Income: $${monthlyIncome}
-
+${recurringSection}
 Recommended Budget:
 - Needs (50%): $${recommendedNeeds.toFixed(2)}
 - Wants (30%): $${recommendedWants.toFixed(2)}

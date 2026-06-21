@@ -65,6 +65,27 @@ export const debts = pgTable("debts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const RECURRING_EXPENSE_FREQUENCIES = [
+  "daily",
+  "weekly",
+  "bi_weekly",
+  "monthly",
+  "semi_monthly",
+  "bi_monthly",
+  "yearly",
+] as const;
+
+export type RecurringExpenseFrequency = (typeof RECURRING_EXPENSE_FREQUENCIES)[number];
+
+export const recurringExpenses = pgTable("recurring_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  frequency: text("frequency").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const appVersions = pgTable("app_versions", {
   id: serial("id").primaryKey(),
   version: text("version").notNull(),
@@ -122,6 +143,20 @@ export const debtUpdateSchema = z.object({
   interestRate: z.string().min(1, "Interest rate is required"),
 });
 
+export const insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const recurringExpenseInputSchema = z.object({
+  name: z.string().min(1, "Expense name is required"),
+  amount: z.string().min(1, "Amount is required"),
+  frequency: z.enum(RECURRING_EXPENSE_FREQUENCIES),
+});
+
+export const recurringExpenseUpdateSchema = recurringExpenseInputSchema;
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
 });
@@ -142,6 +177,9 @@ export type AnalysisEmbedding = typeof analysisEmbeddings.$inferSelect;
 export type GlobalAdviceSnapshot = typeof globalAdviceSnapshots.$inferSelect;
 export type Debt = typeof debts.$inferSelect;
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
+export type RecurringExpense = typeof recurringExpenses.$inferSelect;
+export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
+export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;

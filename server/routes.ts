@@ -10,7 +10,7 @@ import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema, debtUpdateSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
@@ -395,6 +395,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/recurring-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenses = await storage.getRecurringExpensesByUser(req.user.id);
+      res.json(expenses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/recurring-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenseData = recurringExpenseInputSchema.parse(req.body);
+      const expense = await storage.createRecurringExpense(req.user.id, {
+        name: expenseData.name,
+        amount: expenseData.amount,
+        frequency: expenseData.frequency,
+      });
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/recurring-expenses/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenseData = recurringExpenseUpdateSchema.parse(req.body);
+      const expense = await storage.updateRecurringExpense(req.user.id, req.params.id, {
+        name: expenseData.name,
+        amount: expenseData.amount,
+        frequency: expenseData.frequency,
+      });
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/recurring-expenses/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteRecurringExpense(req.user.id, req.params.id);
+      res.json({ message: "Recurring expense deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/auth/google", async (_req, res) => {
     try {
       cleanupGoogleStates();
@@ -486,12 +532,19 @@ async function processFileAsync(userId: string, analysisId: string, filePath: st
 
     // Extract text from file
     const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
+
+    const recurringExpenses = await storage.getRecurringExpensesByUser(userId);
     
     // Analyze with AI
     const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome, {
       userId,
       analysisId,
       runGlobalAdvisor: true,
+      recurringExpenses: recurringExpenses.map((expense) => ({
+        name: expense.name,
+        amount: Number(expense.amount),
+        frequency: expense.frequency,
+      })),
     });
     logger.info("AI analysis completed", {
       userId,

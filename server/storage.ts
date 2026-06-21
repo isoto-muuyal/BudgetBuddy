@@ -4,6 +4,7 @@ import {
   users,
   budgetAnalyses,
   debts,
+  recurringExpenses,
   appVersions,
   admins,
   analysisEmbeddings,
@@ -14,6 +15,8 @@ import {
   type InsertBudgetAnalysis,
   type Debt,
   type InsertDebt,
+  type RecurringExpense,
+  type InsertRecurringExpense,
   type AppVersion,
   type Admin,
 } from "@shared/schema";
@@ -85,6 +88,12 @@ export interface IStorage {
   createDebt(userId: string, debt: InsertDebt): Promise<Debt>;
   updateDebtInterestRate(userId: string, debtId: string, interestRate: string): Promise<Debt>;
   deleteDebt(userId: string, debtId: string): Promise<void>;
+
+  // Recurring expense methods
+  getRecurringExpensesByUser(userId: string): Promise<RecurringExpense[]>;
+  createRecurringExpense(userId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
+  updateRecurringExpense(userId: string, expenseId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
+  deleteRecurringExpense(userId: string, expenseId: string): Promise<void>;
 
   // App version methods
   getLatestAppVersion(): Promise<AppVersion>;
@@ -453,6 +462,46 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(debts)
       .where(and(eq(debts.id, debtId), eq(debts.userId, userId)));
+  }
+
+  async getRecurringExpensesByUser(userId: string): Promise<RecurringExpense[]> {
+    return await db.select().from(recurringExpenses).where(eq(recurringExpenses.userId, userId));
+  }
+
+  async createRecurringExpense(userId: string, expenseInput: InsertRecurringExpense): Promise<RecurringExpense> {
+    const [expense] = await db
+      .insert(recurringExpenses)
+      .values({ ...expenseInput, userId })
+      .returning();
+
+    if (!expense) {
+      throw new Error("Failed to create recurring expense");
+    }
+    return expense;
+  }
+
+  async updateRecurringExpense(
+    userId: string,
+    expenseId: string,
+    expenseInput: InsertRecurringExpense
+  ): Promise<RecurringExpense> {
+    const [expense] = await db
+      .update(recurringExpenses)
+      .set(expenseInput)
+      .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)))
+      .returning();
+
+    if (!expense) {
+      throw new Error("Recurring expense not found");
+    }
+
+    return expense;
+  }
+
+  async deleteRecurringExpense(userId: string, expenseId: string): Promise<void> {
+    await db
+      .delete(recurringExpenses)
+      .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)));
   }
 
   private getNextPatchVersion(version: string): string {

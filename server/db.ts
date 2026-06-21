@@ -190,6 +190,16 @@ export async function ensureDatabaseSchema(): Promise<void> {
       ALTER TABLE debts
       ADD COLUMN IF NOT EXISTS interest_rate numeric(5,2) NOT NULL DEFAULT 0
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS recurring_expenses (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        name text NOT NULL,
+        amount numeric(10,2) NOT NULL,
+        frequency text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
     await ensureAppVersionsTable();
     await ensureAdminTable();
     await ensureAnalysisIntelligenceTables();

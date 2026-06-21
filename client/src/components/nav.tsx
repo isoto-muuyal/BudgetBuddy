@@ -54,6 +54,13 @@ export default function Navigation() {
                   {t("nav.budgetAnalysis")}
                 </Link>
                 <Link
+                  href="/budget"
+                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
+                  data-testid="link-budget"
+                >
+                  {t("nav.budget")}
+                </Link>
+                <Link
                   href="/debt"
                   className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
                   data-testid="link-debt-management"
