@@ -32,7 +32,7 @@ export default function Navigation() {
 
   return (
     <nav className="border-b border-white/10 bg-[#202133] shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-6">
             <Link
@@ -47,18 +47,18 @@ export default function Navigation() {
             {isAuthenticated && (
               <div className="hidden md:flex items-center space-x-4">
                 <Link
-                  href="/income"
-                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
-                  data-testid="link-budget-analysis"
-                >
-                  {t("nav.budgetAnalysis")}
-                </Link>
-                <Link
                   href="/budget"
                   className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
                   data-testid="link-budget"
                 >
                   {t("nav.budget")}
+                </Link>
+                <Link
+                  href="/income"
+                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
+                  data-testid="link-budget-analysis"
+                >
+                  {t("nav.budgetAnalysis")}
                 </Link>
                 <Link
                   href="/debt"
@@ -94,9 +94,8 @@ export default function Navigation() {
               </a>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-theme">
-                    {theme === "dark" ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
-                    {t("nav.theme")}
+                  <Button variant="outline" size="icon" title={t("nav.theme")} data-testid="button-theme">
+                    {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -107,9 +106,8 @@ export default function Navigation() {
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-language">
-                    <Globe className="h-4 w-4 mr-2" />
-                    {t("nav.language")}
+                  <Button variant="outline" size="icon" title={t("nav.language")} data-testid="button-language">
+                    <Globe className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -128,14 +126,15 @@ export default function Navigation() {
                   </Button>
                 </Link>
               ) : (
-                <Button 
+                <Button
                   onClick={handleLogout}
                   variant="outline"
+                  size="icon"
+                  title={t("nav.logout")}
                   className="border-white/10 bg-transparent text-white hover:bg-white/10 transition-colors"
                   data-testid="button-logout"
                 >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {t("nav.logout")}
+                  <LogOut className="w-4 h-4" />
                 </Button>
               )}
             </div>
@@ -164,9 +163,8 @@ export default function Navigation() {
               </a>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-theme">
-                    {theme === "dark" ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
-                    {t("nav.theme")}
+                  <Button variant="outline" size="icon" title={t("nav.theme")} data-testid="button-theme">
+                    {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -177,9 +175,8 @@ export default function Navigation() {
               </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-language">
-                    <Globe className="h-4 w-4 mr-2" />
-                    {t("nav.language")}
+                  <Button variant="outline" size="icon" title={t("nav.language")} data-testid="button-language">
+                    <Globe className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -190,14 +187,15 @@ export default function Navigation() {
                   <DropdownMenuItem onClick={() => setLocale("ru")}>Русский</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button 
+              <Button
                 onClick={handleLogout}
                 variant="outline"
+                size="icon"
+                title={t("nav.logout")}
                 className="border-white/10 bg-transparent text-white hover:bg-white/10 transition-colors"
                 data-testid="button-logout"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                {t("nav.logout")}
+                <LogOut className="w-4 h-4" />
               </Button>
             </div>
           )}
