@@ -12,6 +12,8 @@ import Upload from "@/pages/upload";
 import Results from "@/pages/results";
 import Debt from "@/pages/debt";
 import About from "@/pages/about";
+import HowItWorks from "@/pages/how-it-works";
+import Contact from "@/pages/contact";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Navigation from "@/components/nav";
@@ -42,6 +44,8 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/history" component={History} />
         <Route path="/about" component={About} />
+        <Route path="/how-it-works" component={HowItWorks} />
+        <Route path="/contact" component={Contact} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/admin" component={AdminPage} />

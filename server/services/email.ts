@@ -169,6 +169,50 @@ export class EmailService {
     }
   }
 
+  async sendContactFormEmail(name: string, email: string, subject: string, message: string) {
+    const recipient = new Recipient(config.contact.recipientEmail, config.mailersend.fromName);
+    const replyTo = new Recipient(email, name);
+
+    const emailParams = new EmailParams()
+      .setFrom(this.sender)
+      .setTo([recipient])
+      .setReplyTo(replyTo)
+      .setSubject(`[BudgetWise Contact] ${subject}`)
+      .setHtml(`
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(to right, #3B82F6, #8B5CF6); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">New Contact Form Submission</h1>
+          </div>
+          <div style="padding: 30px; background: #f9fafb;">
+            <p style="color: #374151;"><strong>Name:</strong> ${name}</p>
+            <p style="color: #374151;"><strong>Email:</strong> ${email}</p>
+            <p style="color: #374151;"><strong>Subject:</strong> ${subject}</p>
+            <p style="color: #374151;"><strong>Message:</strong></p>
+            <p style="color: #6b7280; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+          </div>
+        </div>
+      `)
+      .setText(`
+        New Contact Form Submission
+
+        Name: ${name}
+        Email: ${email}
+        Subject: ${subject}
+
+        Message:
+        ${message}
+      `);
+
+    try {
+      const response = await this.mailerSend.email.send(emailParams);
+      console.log("Contact form email sent successfully:", response);
+      return response;
+    } catch (error) {
+      console.error("Failed to send contact form email:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const emailService = new EmailService();

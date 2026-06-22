@@ -76,6 +76,12 @@ export default function Navigation() {
               <Link href="/about" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-about">
                 {t("nav.about")}
               </Link>
+              <Link href="/how-it-works" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-how-it-works">
+                {t("nav.howItWorks")}
+              </Link>
+              <Link href="/contact" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-contact">
+                {t("nav.contactUs")}
+              </Link>
               <Link href="/terms" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-terms">
                 {t("nav.terms")}
               </Link>
@@ -144,6 +150,12 @@ export default function Navigation() {
             <div className="hidden md:flex items-center space-x-4">
               <Link href="/about" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-about">
                 {t("nav.about")}
+              </Link>
+              <Link href="/how-it-works" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-how-it-works">
+                {t("nav.howItWorks")}
+              </Link>
+              <Link href="/contact" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-contact">
+                {t("nav.contactUs")}
               </Link>
               <Link href="/terms" className="text-slate-300 hover:text-amber-300 transition-colors" data-testid="link-terms">
                 {t("nav.terms")}

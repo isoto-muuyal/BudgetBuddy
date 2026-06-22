@@ -6,11 +6,12 @@ import path from "path";
 import { storage } from "./storage";
 import { authService } from "./services/auth";
 import { adminService } from "./services/admin";
+import { emailService } from "./services/email";
 import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
@@ -187,6 +188,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = resetPasswordSchema.parse(req.body);
       const result = await authService.resetPassword(data);
       res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const { name, email, subject, message } = contactFormSchema.parse(req.body);
+      await emailService.sendContactFormEmail(name, email, subject, message);
+      res.json({ message: "Message sent successfully" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

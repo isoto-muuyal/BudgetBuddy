@@ -166,6 +166,13 @@ export const resetPasswordSchema = z.object({
   newPassword: z.string().min(6, "Password must be at least 6 characters long."),
 });
 
+export const contactFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  subject: z.string().min(1, "Subject is required"),
+  message: z.string().min(1, "Message is required"),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;
@@ -182,5 +189,6 @@ export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema
 export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;
 export type Admin = typeof admins.$inferSelect;

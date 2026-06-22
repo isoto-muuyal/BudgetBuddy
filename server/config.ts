@@ -4,6 +4,9 @@ export const config = {
     fromEmail: process.env.FROM_EMAIL || "noreply@muuyal.tech",
     fromName: process.env.FROM_NAME || "BudgetWise by Muuyal",
   },
+  contact: {
+    recipientEmail: process.env.CONTACT_EMAIL || process.env.FROM_EMAIL || "noreply@muuyal.tech",
+  },
   ai: {
     service: process.env.AI_SERVICE || "huggingface", // "ollama" or "huggingface"
     // Categorization API - optimized for structured JSON output
