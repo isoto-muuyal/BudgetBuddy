@@ -67,8 +67,23 @@ export async function ensureDatabaseSchema(): Promise<void> {
         name text NOT NULL,
         amount numeric(10,2) NOT NULL,
         frequency text NOT NULL,
+        category text NOT NULL DEFAULT 'wants',
+        type text NOT NULL DEFAULT 'housing',
+        enabled boolean NOT NULL DEFAULT true,
         created_at timestamp DEFAULT now()
       )
+    `);
+    await pool.query(`
+      ALTER TABLE recurring_expenses
+      ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'wants'
+    `);
+    await pool.query(`
+      ALTER TABLE recurring_expenses
+      ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'housing'
+    `);
+    await pool.query(`
+      ALTER TABLE recurring_expenses
+      ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true
     `);
   };
 

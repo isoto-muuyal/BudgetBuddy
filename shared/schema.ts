@@ -77,12 +77,33 @@ export const RECURRING_EXPENSE_FREQUENCIES = [
 
 export type RecurringExpenseFrequency = (typeof RECURRING_EXPENSE_FREQUENCIES)[number];
 
+export const RECURRING_EXPENSE_CATEGORIES = ["needs", "wants", "savings"] as const;
+
+export type RecurringExpenseCategory = (typeof RECURRING_EXPENSE_CATEGORIES)[number];
+
+export const RECURRING_EXPENSE_TYPES = [
+  "housing",
+  "food",
+  "eating_out",
+  "savings",
+  "credit_payment",
+  "vacations",
+  "electronics",
+  "coffee",
+  "mobility",
+] as const;
+
+export type RecurringExpenseType = (typeof RECURRING_EXPENSE_TYPES)[number];
+
 export const recurringExpenses = pgTable("recurring_expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   frequency: text("frequency").notNull(),
+  category: text("category").notNull().default("wants"),
+  type: text("type").notNull().default("housing"),
+  enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -159,9 +180,15 @@ export const recurringExpenseInputSchema = z.object({
   name: z.string().min(1, "Expense name is required"),
   amount: z.string().min(1, "Amount is required"),
   frequency: z.enum(RECURRING_EXPENSE_FREQUENCIES),
+  category: z.enum(RECURRING_EXPENSE_CATEGORIES),
+  type: z.enum(RECURRING_EXPENSE_TYPES),
 });
 
 export const recurringExpenseUpdateSchema = recurringExpenseInputSchema;
+
+export const recurringExpenseToggleSchema = z.object({
+  enabled: z.boolean(),
+});
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -201,6 +228,7 @@ export type InsertDebt = z.infer<typeof insertDebtSchema>;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
 export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
+export type RecurringExpenseToggleInput = z.infer<typeof recurringExpenseToggleSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ContactFormInput = z.infer<typeof contactFormSchema>;

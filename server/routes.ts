@@ -11,7 +11,7 @@ import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema, pageContentUpdateSchema, PAGE_CONTENT_SLUGS } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema, recurringExpenseToggleSchema, pageContentUpdateSchema, PAGE_CONTENT_SLUGS } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
@@ -452,6 +452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: expenseData.name,
         amount: expenseData.amount,
         frequency: expenseData.frequency,
+        category: expenseData.category,
+        type: expenseData.type,
       });
       res.json(expense);
     } catch (error: any) {
@@ -466,7 +468,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: expenseData.name,
         amount: expenseData.amount,
         frequency: expenseData.frequency,
+        category: expenseData.category,
+        type: expenseData.type,
       });
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/recurring-expenses/:id/toggle", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { enabled } = recurringExpenseToggleSchema.parse(req.body);
+      const expense = await storage.toggleRecurringExpense(req.user.id, req.params.id, enabled);
       res.json(expense);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

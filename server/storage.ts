@@ -95,6 +95,7 @@ export interface IStorage {
   getRecurringExpensesByUser(userId: string): Promise<RecurringExpense[]>;
   createRecurringExpense(userId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
   updateRecurringExpense(userId: string, expenseId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
+  toggleRecurringExpense(userId: string, expenseId: string, enabled: boolean): Promise<RecurringExpense>;
   deleteRecurringExpense(userId: string, expenseId: string): Promise<void>;
 
   // App version methods
@@ -494,6 +495,20 @@ export class DatabaseStorage implements IStorage {
     const [expense] = await db
       .update(recurringExpenses)
       .set(expenseInput)
+      .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)))
+      .returning();
+
+    if (!expense) {
+      throw new Error("Recurring expense not found");
+    }
+
+    return expense;
+  }
+
+  async toggleRecurringExpense(userId: string, expenseId: string, enabled: boolean): Promise<RecurringExpense> {
+    const [expense] = await db
+      .update(recurringExpenses)
+      .set({ enabled })
       .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)))
       .returning();
 
