@@ -98,6 +98,12 @@ export const admins = pgTable("ADMIN", {
   password: text("password").notNull(),
 });
 
+export const pageContent = pgTable("page_content", {
+  slug: text("slug").primaryKey(),
+  content: jsonb("content").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   emailVerified: true,
@@ -173,6 +179,14 @@ export const contactFormSchema = z.object({
   message: z.string().min(1, "Message is required"),
 });
 
+export const PAGE_CONTENT_SLUGS = ["about", "how-it-works", "privacy"] as const;
+
+export type PageContentSlug = (typeof PAGE_CONTENT_SLUGS)[number];
+
+export const pageContentUpdateSchema = z.object({
+  content: z.record(z.string(), z.any()),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;
@@ -192,3 +206,5 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;
 export type Admin = typeof admins.$inferSelect;
+export type PageContent = typeof pageContent.$inferSelect;
+export type PageContentUpdateInput = z.infer<typeof pageContentUpdateSchema>;

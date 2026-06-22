@@ -11,7 +11,7 @@ import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema } from "@shared/schema";
+import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema, pageContentUpdateSchema, PAGE_CONTENT_SLUGS } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
@@ -198,6 +198,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, email, subject, message } = contactFormSchema.parse(req.body);
       await emailService.sendContactFormEmail(name, email, subject, message);
       res.json({ message: "Message sent successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/content/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      if (!PAGE_CONTENT_SLUGS.includes(slug as any)) {
+        return res.status(404).json({ message: "Content not found" });
+      }
+      const page = await storage.getPageContent(slug);
+      if (!page) {
+        return res.status(404).json({ message: "Content not found" });
+      }
+      res.json(page);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/content/:slug", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const { slug } = req.params;
+      if (!PAGE_CONTENT_SLUGS.includes(slug as any)) {
+        return res.status(404).json({ message: "Content not found" });
+      }
+      const { content } = pageContentUpdateSchema.parse(req.body);
+      const page = await storage.upsertPageContent(slug, content);
+      res.json(page);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

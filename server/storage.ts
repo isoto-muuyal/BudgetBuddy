@@ -9,6 +9,7 @@ import {
   admins,
   analysisEmbeddings,
   globalAdviceSnapshots,
+  pageContent,
   type User,
   type InsertUser,
   type BudgetAnalysis,
@@ -19,6 +20,7 @@ import {
   type InsertRecurringExpense,
   type AppVersion,
   type Admin,
+  type PageContent,
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
@@ -101,6 +103,10 @@ export interface IStorage {
 
   // Admin methods
   getAdminByUsername(username: string): Promise<Admin | undefined>;
+
+  // Page content methods
+  getPageContent(slug: string): Promise<PageContent | undefined>;
+  upsertPageContent(slug: string, content: Record<string, unknown>): Promise<PageContent>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -564,6 +570,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(admins.username, username));
 
     return admin || undefined;
+  }
+
+  async getPageContent(slug: string): Promise<PageContent | undefined> {
+    const [row] = await db
+      .select()
+      .from(pageContent)
+      .where(eq(pageContent.slug, slug));
+
+    return row || undefined;
+  }
+
+  async upsertPageContent(slug: string, content: Record<string, unknown>): Promise<PageContent> {
+    const [row] = await db
+      .insert(pageContent)
+      .values({ slug, content })
+      .onConflictDoUpdate({
+        target: pageContent.slug,
+        set: { content, updatedAt: new Date() },
+      })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to save page content");
+    }
+
+    return row;
   }
 }
 

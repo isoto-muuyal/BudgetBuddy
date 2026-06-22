@@ -72,6 +72,98 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensurePageContentTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS page_content (
+        slug text PRIMARY KEY,
+        content jsonb NOT NULL,
+        updated_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+
+    const seeds: Array<{ slug: string; content: Record<string, unknown> }> = [
+      {
+        slug: "about",
+        content: {
+          title: "About BudgetWise",
+          subtitle: "Your personal finance companion that helps you master the art of budgeting with the proven 50/30/20 rule.",
+          smart: "Smart Analysis",
+          smartBody: "Upload your bank statements and let our AI analyze your spending patterns. Get personalized insights on how your expenses align with the 50/30/20 budgeting rule.",
+          privacy: "Privacy First",
+          privacyBody: "Your financial data is processed securely and never shared with third parties. We believe your privacy is paramount when it comes to personal finance management.",
+          insights: "Instant Insights",
+          insightsBody: "Get immediate feedback on your spending habits with categorized expenses and actionable recommendations to improve your financial health.",
+          built: "Built for Everyone",
+          builtBody: "Whether you're just starting your financial journey or looking to optimize your budget, BudgetWise provides clear, actionable insights for all experience levels.",
+          ruleTitle: "The 50/30/20 Rule",
+          ruleIntro: "This simple framework helps you balance essentials, lifestyle, and long-term goals. It makes money decisions easier because every dollar has a job.",
+          ruleWhy: "Why it matters",
+          ruleWhyBody: "Clear buckets reduce stress, reveal overspending early, and keep savings consistent. It's a practical baseline that works with most incomes.",
+          needsTitle: "Needs",
+          needsBody: "Essential expenses like rent, groceries, utilities, and minimum debt payments",
+          wantsTitle: "Wants",
+          wantsBody: "Non-essential expenses like entertainment, dining out, and hobbies",
+          savingsTitle: "Savings",
+          savingsBody: "Money saved, invested, or put toward debt payments above minimums",
+        },
+      },
+      {
+        slug: "how-it-works",
+        content: {
+          title: "How BudgetWise Works",
+          subtitle: "From bank statement to a clear budget plan in four simple steps.",
+          step1Title: "1. Create your account",
+          step1Body: "Sign up in seconds and tell us your monthly income to set your baseline.",
+          step2Title: "2. Upload your statement",
+          step2Body: "Upload a bank or credit card statement and our AI automatically categorizes every transaction.",
+          step3Title: "3. Get your 50/30/20 breakdown",
+          step3Body: "See exactly how your spending compares to the recommended needs, wants, and savings split.",
+          step4Title: "4. Track and improve",
+          step4Body: "Manage recurring expenses, pay down debt, and revisit your analysis anytime to track your progress.",
+          ctaTitle: "Ready to take control of your budget?",
+          ctaBody: "Create a free account and upload your first statement today.",
+          ctaButton: "Get Started",
+        },
+      },
+      {
+        slug: "privacy",
+        content: {
+          title: "Privacy Policy",
+          updated: "Last updated: January 2025",
+          s1Title: "1. Information We Collect",
+          s1Body: "We collect information you provide directly to us, such as when you create an account, upload financial documents, or contact support.",
+          s2Title: "2. How We Use Information",
+          s2Body: "We use your information to provide, maintain, and improve our services:",
+          s2List: [
+            "Process and analyze your uploaded financial data",
+            "Provide personalized budget recommendations",
+            "Improve our AI analysis algorithms and service features",
+            "Communicate important service updates",
+          ],
+          s3Title: "3. Data Storage and Security",
+          s3Body: "We implement appropriate security measures to protect your information. Your data is stored securely and accessed only by authorized systems.",
+          s4Title: "4. Data Sharing",
+          s4Body: "We do not sell or share your personal financial data with third parties. We only share data when required by law or to provide our services.",
+          s5Title: "5. Your Rights",
+          s5Body: "You have the right to access, update, or delete your data. Contact support if you want to exercise these rights.",
+          s6Title: "6. Cookies",
+          s6Body: "We use cookies to keep you signed in and improve the user experience.",
+          s7Title: "7. Contact",
+          s7Body: "If you have questions about this Privacy Policy, please contact us through the support channels provided in the application.",
+        },
+      },
+    ];
+
+    for (const seed of seeds) {
+      await pool.query(
+        `INSERT INTO page_content (slug, content)
+         VALUES ($1, $2)
+         ON CONFLICT (slug) DO NOTHING`,
+        [seed.slug, JSON.stringify(seed.content)]
+      );
+    }
+  };
+
   const ensureAnalysisIntelligenceTables = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analysis_embeddings (
@@ -104,6 +196,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAdminTable();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
+    await ensurePageContentTable();
     return;
   }
 
@@ -120,6 +213,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAdminTable();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePageContentTable();
       return;
     }
 
@@ -128,6 +222,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAdminTable();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePageContentTable();
       console.log("app_versions and ADMIN tables ensured successfully.");
       return;
     }
@@ -152,6 +247,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       }
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePageContentTable();
       console.log("Database schema created successfully.");
       return;
     }
@@ -221,6 +317,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAdminTable();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
+    await ensurePageContentTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);
