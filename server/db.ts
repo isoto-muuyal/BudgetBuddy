@@ -179,6 +179,48 @@ export async function ensureDatabaseSchema(): Promise<void> {
     }
   };
 
+  const ensureIncomesTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS incomes (
+        user_id varchar PRIMARY KEY REFERENCES users(id),
+        main_income numeric(10,2) NOT NULL DEFAULT 0,
+        other_incomes jsonb NOT NULL DEFAULT '[]'::jsonb,
+        needs numeric(10,2) NOT NULL DEFAULT 0,
+        wants numeric(10,2) NOT NULL DEFAULT 0,
+        savings numeric(10,2) NOT NULL DEFAULT 0,
+        updated_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+  };
+
+  const ensureActualExpenseSetsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS actual_expense_sets (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        name text NOT NULL,
+        items jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamp DEFAULT now() NOT NULL,
+        updated_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+  };
+
+  const ensureSmartAnalysisResultsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS smart_analysis_results (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        actual_expense_set_id varchar REFERENCES actual_expense_sets(id),
+        include_fifty_thirty_twenty boolean NOT NULL DEFAULT true,
+        include_monthly_expenses boolean NOT NULL DEFAULT true,
+        snapshot jsonb NOT NULL,
+        recommendations text NOT NULL,
+        created_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+  };
+
   const ensureAnalysisIntelligenceTables = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS analysis_embeddings (
@@ -212,6 +254,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePageContentTable();
+    await ensureIncomesTable();
+    await ensureActualExpenseSetsTable();
+    await ensureSmartAnalysisResultsTable();
     return;
   }
 
@@ -229,6 +274,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
+      await ensureIncomesTable();
+      await ensureActualExpenseSetsTable();
+      await ensureSmartAnalysisResultsTable();
       return;
     }
 
@@ -238,6 +286,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
+      await ensureIncomesTable();
+      await ensureActualExpenseSetsTable();
+      await ensureSmartAnalysisResultsTable();
       console.log("app_versions and ADMIN tables ensured successfully.");
       return;
     }
@@ -263,6 +314,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
+      await ensureIncomesTable();
+      await ensureActualExpenseSetsTable();
+      await ensureSmartAnalysisResultsTable();
       console.log("Database schema created successfully.");
       return;
     }
@@ -333,6 +387,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePageContentTable();
+    await ensureIncomesTable();
+    await ensureActualExpenseSetsTable();
+    await ensureSmartAnalysisResultsTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {
     console.error("Failed to ensure database schema:", error);

@@ -1,65 +1,71 @@
-import { useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { HandCoins, History } from "lucide-react";
+import { HandCoins, History, Plus, Pencil, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { incomeSchema, type IncomeInput } from "@shared/schema";
+import { apiRequest, getAuthToken, queryClient } from "@/lib/queryClient";
+import {
+  EXPENSE_ITEM_CATEGORIES,
+  EXPENSE_ITEM_TYPES,
+  type ActualExpenseSet,
+  type ExpenseItem,
+} from "@shared/schema";
 import { useTranslation } from "react-i18next";
 
-export default function Income() {
+export default function SmartAnalysis() {
   const [, setLocation] = useLocation();
-  const [budget, setBudget] = useState({ needs: 0, wants: 0, savings: 0 });
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  const form = useForm({
-    resolver: zodResolver(incomeSchema),
-    defaultValues: {
-      monthlyIncome: "",
+  const [includeFiftyThirtyTwenty, setIncludeFiftyThirtyTwenty] = useState(true);
+  const [includeMonthlyExpenses, setIncludeMonthlyExpenses] = useState(true);
+  const [selectedSetId, setSelectedSetId] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedItems, setEditedItems] = useState<ExpenseItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: expenseSets = [] } = useQuery<ActualExpenseSet[]>({
+    queryKey: ["/api/actual-expense-sets"],
+  });
+
+  const selectedSet = expenseSets.find((set) => set.id === selectedSetId);
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch("/api/actual-expense-sets/upload", {
+        method: "POST",
+        headers,
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Upload failed");
+      }
+
+      return (await response.json()) as ActualExpenseSet;
     },
-  });
-
-  const { data: userProfile } = useQuery<any>({
-    queryKey: ["/api/user/profile"],
-  });
-
-  const { data: latestGlobalAdvice } = useQuery<any>({
-    queryKey: ["/api/global-advice/latest"],
-  });
-
-  useEffect(() => {
-    if (userProfile?.monthlyIncome) {
-      form.setValue("monthlyIncome", userProfile.monthlyIncome.toString(), { shouldValidate: true });
-    }
-  }, [form, userProfile?.monthlyIncome]);
-
-  const watchIncome = form.watch("monthlyIncome");
-
-  useEffect(() => {
-    const income = parseFloat(watchIncome as string) || 0;
-    setBudget({
-      needs: income * 0.5,
-      wants: income * 0.3,
-      savings: income * 0.2,
-    });
-  }, [watchIncome]);
-
-  const incomeMutation = useMutation({
-    mutationFn: async (data: IncomeInput) => {
-      const response = await apiRequest("POST", "/api/user/income", data);
-      return response.json();
-    },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/actual-expense-sets"] });
+      setSelectedSetId(data.id);
       toast({
-        title: t("income.updatedTitle"),
-        description: t("income.updatedDesc"),
+        title: t("smartAnalysis.uploadSuccessTitle"),
+        description: t("smartAnalysis.uploadSuccessDesc"),
       });
     },
     onError: (error: Error) => {
@@ -71,116 +77,306 @@ export default function Income() {
     },
   });
 
-  const onSubmit = (data: any) => {
-    incomeMutation.mutate(data);
+  const updateSetMutation = useMutation({
+    mutationFn: async (items: ExpenseItem[]) => {
+      const response = await apiRequest("PATCH", `/api/actual-expense-sets/${selectedSetId}`, { items });
+      return (await response.json()) as ActualExpenseSet;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/actual-expense-sets"] });
+      setIsEditing(false);
+      toast({
+        title: t("smartAnalysis.updateSuccessTitle"),
+        description: t("smartAnalysis.updateSuccessDesc"),
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("common.error"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const analysisMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/smart-analysis", {
+        actualExpenseSetId: selectedSetId,
+        includeFiftyThirtyTwenty,
+        includeMonthlyExpenses,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setLocation(`/smart-analysis/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("common.error"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+    event.target.value = "";
+  };
+
+  const startEditing = () => {
+    if (!selectedSet) return;
+    setEditedItems((selectedSet.items as ExpenseItem[]).map((item) => ({ ...item })));
+    setIsEditing(true);
+  };
+
+  const updateEditedItem = (index: number, field: keyof ExpenseItem, value: string) => {
+    setEditedItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value } as ExpenseItem;
+      return next;
+    });
   };
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-[#5b5c67] px-4 py-8">
-    <div className="mx-auto max-w-4xl">
-      <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-income">
-        <CardContent className="p-8">
-          <div className="text-center mb-8">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-white/10 text-amber-400">
-              <HandCoins className="h-8 w-8" />
+      <div className="mx-auto max-w-5xl">
+        <Card className="border-white/10 bg-[#202133] text-white shadow-xl" data-testid="card-smart-analysis">
+          <CardContent className="p-8">
+            <div className="text-center mb-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-white/10 text-amber-400">
+                <HandCoins className="h-8 w-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-page-title">
+                {t("smartAnalysis.title")}
+              </h2>
+              <p className="text-slate-300" data-testid="text-page-description">
+                {t("smartAnalysis.description")}
+              </p>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2" data-testid="text-income-title">
-              {t("income.title")}
-            </h2>
-            <p className="text-slate-300" data-testid="text-income-description">
-              {t("income.description")}
-            </p>
-          </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="monthlyIncome"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-slate-300">{t("income.label")}</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-4 top-3 text-slate-500 text-lg">$</span>
-                        <Input
-                          {...field}
-                          type="number"
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          className="w-full rounded-lg border border-white/10 bg-[#171827] py-3 pl-8 pr-4 text-lg text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-400"
-                          data-testid="input-income"
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="space-y-6">
+              <div className="rounded-lg border border-white/10 bg-[#171827] p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="checkbox-fifty-thirty-twenty"
+                    checked={includeFiftyThirtyTwenty}
+                    onCheckedChange={(checked) => setIncludeFiftyThirtyTwenty(checked === true)}
+                    data-testid="checkbox-fifty-thirty-twenty"
+                  />
+                  <label htmlFor="checkbox-fifty-thirty-twenty" className="text-sm text-slate-200">
+                    {t("smartAnalysis.includeFiftyThirtyTwenty")}
+                  </label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="checkbox-monthly-expenses"
+                    checked={includeMonthlyExpenses}
+                    onCheckedChange={(checked) => setIncludeMonthlyExpenses(checked === true)}
+                    data-testid="checkbox-monthly-expenses"
+                  />
+                  <label htmlFor="checkbox-monthly-expenses" className="text-sm text-slate-200">
+                    {t("smartAnalysis.includeMonthlyExpenses")}
+                  </label>
+                </div>
 
-              <div className="rounded-lg border border-white/10 bg-[#171827] p-4" data-testid="card-budget-preview">
-                <h3 className="font-medium text-white mb-2">{t("income.ruleTitle")}</h3>
-                <div className="space-y-1 text-sm text-slate-300">
-                  <div className="flex justify-between">
-                    <span>{t("income.needs")}</span>
-                    <span data-testid="text-needs-amount">${budget.needs.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t("income.wants")}</span>
-                    <span data-testid="text-wants-amount">${budget.wants.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t("income.savings")}</span>
-                    <span data-testid="text-savings-amount">${budget.savings.toFixed(2)}</span>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-300">{t("smartAnalysis.actualExpensesLabel")}</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Select
+                      value={selectedSetId}
+                      onValueChange={(value) => {
+                        setSelectedSetId(value);
+                        setIsEditing(false);
+                      }}
+                    >
+                      <SelectTrigger className="w-64 border-white/10 bg-[#202133] text-white" data-testid="select-actual-expense-set">
+                        <SelectValue placeholder={t("smartAnalysis.selectExpenseSetPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {expenseSets.map((set) => (
+                          <SelectItem key={set.id} value={set.id}>
+                            {set.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-white/10 bg-transparent text-white hover:bg-white/10"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadMutation.isPending}
+                      data-testid="button-add-new-expense-set"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      {uploadMutation.isPending ? t("smartAnalysis.uploading") : t("smartAnalysis.addNew")}
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      data-testid="input-expense-csv"
+                    />
+
+                    {selectedSet && !isEditing && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/10 bg-transparent text-white hover:bg-white/10"
+                        onClick={startEditing}
+                        data-testid="button-edit-expense-set"
+                      >
+                        <Pencil className="h-4 w-4 mr-1" />
+                        {t("smartAnalysis.edit")}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-4" data-testid="card-latest-global-advice">
-                <h3 className="font-medium text-white mb-2">{t("income.latestGlobalAdviceTitle")}</h3>
-                {latestGlobalAdvice?.advice ? (
-                  <div className="space-y-2 text-sm text-slate-300 whitespace-pre-line">
-                    <p>{latestGlobalAdvice.advice}</p>
-                    <p className="text-xs uppercase tracking-wide text-emerald-300">
-                      {t("income.latestGlobalAdviceStatus", { status: latestGlobalAdvice.progressStatus })}
-                    </p>
+              {isEditing && selectedSet && (
+                <div className="rounded-lg border border-white/10 bg-[#171827] p-4 overflow-x-auto" data-testid="table-edit-expenses">
+                  <table className="w-full text-sm text-slate-200">
+                    <thead>
+                      <tr className="text-left text-slate-400 border-b border-white/10">
+                        <th className="py-2 pr-2">{t("smartAnalysis.colDate")}</th>
+                        <th className="py-2 pr-2">{t("smartAnalysis.colDescription")}</th>
+                        <th className="py-2 pr-2">{t("smartAnalysis.colBusiness")}</th>
+                        <th className="py-2 pr-2">{t("smartAnalysis.colAmount")}</th>
+                        <th className="py-2 pr-2">{t("smartAnalysis.colType")}</th>
+                        <th className="py-2 pr-2">{t("smartAnalysis.colCategory")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editedItems.map((item, index) => (
+                        <tr key={index} className="border-b border-white/5" data-testid={`row-expense-${index}`}>
+                          <td className="py-1 pr-2">
+                            <Input
+                              value={item.date ?? ""}
+                              onChange={(e) => updateEditedItem(index, "date", e.target.value)}
+                              className="h-8 w-28 border-white/10 bg-[#202133] text-white"
+                              data-testid={`input-expense-date-${index}`}
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Input
+                              value={item.description ?? ""}
+                              onChange={(e) => updateEditedItem(index, "description", e.target.value)}
+                              className="h-8 w-40 border-white/10 bg-[#202133] text-white"
+                              data-testid={`input-expense-description-${index}`}
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Input
+                              value={item.business ?? ""}
+                              onChange={(e) => updateEditedItem(index, "business", e.target.value)}
+                              className="h-8 w-32 border-white/10 bg-[#202133] text-white"
+                              data-testid={`input-expense-business-${index}`}
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Input
+                              value={item.amount ?? ""}
+                              onChange={(e) => updateEditedItem(index, "amount", e.target.value)}
+                              className="h-8 w-24 border-white/10 bg-[#202133] text-white"
+                              data-testid={`input-expense-amount-${index}`}
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              value={item.type}
+                              onValueChange={(value) => updateEditedItem(index, "type", value)}
+                            >
+                              <SelectTrigger className="h-8 w-32 border-white/10 bg-[#202133] text-white" data-testid={`select-expense-type-${index}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {EXPENSE_ITEM_TYPES.map((type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {t(`expenseItem.type.${type}`)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Select
+                              value={item.category}
+                              onValueChange={(value) => updateEditedItem(index, "category", value)}
+                            >
+                              <SelectTrigger className="h-8 w-36 border-white/10 bg-[#202133] text-white" data-testid={`select-expense-category-${index}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {EXPENSE_ITEM_CATEGORIES.map((category) => (
+                                  <SelectItem key={category} value={category}>
+                                    {t(`expenseItem.category.${category}`)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="mt-4 flex justify-end gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-white/10 bg-transparent text-white hover:bg-white/10"
+                      onClick={() => setIsEditing(false)}
+                      data-testid="button-cancel-edit"
+                    >
+                      {t("smartAnalysis.cancel")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-amber-500 text-slate-950 hover:bg-amber-400"
+                      onClick={() => updateSetMutation.mutate(editedItems)}
+                      disabled={updateSetMutation.isPending}
+                      data-testid="button-save-edit"
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      {updateSetMutation.isPending ? t("smartAnalysis.saving") : t("smartAnalysis.save")}
+                    </Button>
                   </div>
-                ) : (
-                  <p className="text-sm text-slate-300">{t("income.latestGlobalAdviceEmpty")}</p>
-                )}
-              </div>
+                </div>
+              )}
 
               <Button
-                type="submit"
+                type="button"
                 className="w-full rounded-lg bg-amber-500 py-3 font-medium text-slate-950 hover:bg-amber-400 transition-colors"
-                disabled={incomeMutation.isPending}
+                disabled={!selectedSetId || analysisMutation.isPending}
+                onClick={() => analysisMutation.mutate()}
                 data-testid="button-calculate"
               >
-                {incomeMutation.isPending ? t("income.calculating") : t("income.calculate")}
-              </Button> 
-              <Button
-                type="button"
-                className="w-full rounded-lg border border-white/10 bg-[#171827] py-3 font-medium text-white hover:bg-white/10"
-                onClick={() => setLocation("/upload")}
-                data-testid="button-upload-new"
-              >
-                {t("income.upload")}
+                {analysisMutation.isPending ? t("smartAnalysis.calculating") : t("smartAnalysis.calculate")}
               </Button>
+
               <Button
                 type="button"
                 variant="outline"
-                className="w-full rounded-lg border-white/10 bg-transparent py-3 font-medium text-white hover:bg-white/10 mt-3"
+                className="w-full rounded-lg border-white/10 bg-transparent py-3 font-medium text-white hover:bg-white/10"
                 onClick={() => setLocation("/history")}
-                data-testid="button-view-history">
-                  <History className="w-4 h-4 mr-2" />
-                  {t("income.history")}
+                data-testid="button-view-history"
+              >
+                <History className="w-4 h-4 mr-2" />
+                {t("smartAnalysis.history")}
               </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

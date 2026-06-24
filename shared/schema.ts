@@ -214,6 +214,97 @@ export const pageContentUpdateSchema = z.object({
   content: z.record(z.string(), z.any()),
 });
 
+export const otherIncomeEntrySchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  amount: z.string().min(1, "Amount is required"),
+});
+
+export type OtherIncomeEntry = z.infer<typeof otherIncomeEntrySchema>;
+
+export const incomeBreakdownInputSchema = z.object({
+  mainIncome: z.string().min(1, "Main income is required"),
+  otherIncomes: z.array(otherIncomeEntrySchema).default([]),
+});
+
+export type IncomeBreakdownInput = z.infer<typeof incomeBreakdownInputSchema>;
+
+export const incomes = pgTable("incomes", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  mainIncome: decimal("main_income", { precision: 10, scale: 2 }).notNull().default("0"),
+  otherIncomes: jsonb("other_incomes").notNull().default(sql`'[]'::jsonb`),
+  needs: decimal("needs", { precision: 10, scale: 2 }).notNull().default("0"),
+  wants: decimal("wants", { precision: 10, scale: 2 }).notNull().default("0"),
+  savings: decimal("savings", { precision: 10, scale: 2 }).notNull().default("0"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type IncomeBreakdown = typeof incomes.$inferSelect;
+
+export const EXPENSE_ITEM_TYPES = ["needs", "wants", "savings", "other"] as const;
+
+export type ExpenseItemType = (typeof EXPENSE_ITEM_TYPES)[number];
+
+export const EXPENSE_ITEM_CATEGORIES = [
+  "restaurant",
+  "entertainment",
+  "movies",
+  "clothes",
+  "groceries",
+  "gas",
+  "savings",
+  "other",
+] as const;
+
+export type ExpenseItemCategory = (typeof EXPENSE_ITEM_CATEGORIES)[number];
+
+export const expenseItemSchema = z.object({
+  date: z.string().optional().default(""),
+  description: z.string().default(""),
+  business: z.string().default(""),
+  amount: z.string().default("0"),
+  category: z.enum(EXPENSE_ITEM_CATEGORIES).default("other"),
+  type: z.enum(EXPENSE_ITEM_TYPES).default("other"),
+});
+
+export type ExpenseItem = z.infer<typeof expenseItemSchema>;
+
+export const actualExpenseSets = pgTable("actual_expense_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  items: jsonb("items").notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const actualExpenseSetUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  items: z.array(expenseItemSchema),
+});
+
+export type ActualExpenseSet = typeof actualExpenseSets.$inferSelect;
+export type ActualExpenseSetUpdateInput = z.infer<typeof actualExpenseSetUpdateSchema>;
+
+export const smartAnalysisResults = pgTable("smart_analysis_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  actualExpenseSetId: varchar("actual_expense_set_id").references(() => actualExpenseSets.id),
+  includeFiftyThirtyTwenty: boolean("include_fifty_thirty_twenty").notNull().default(true),
+  includeMonthlyExpenses: boolean("include_monthly_expenses").notNull().default(true),
+  snapshot: jsonb("snapshot").notNull(),
+  recommendations: text("recommendations").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const smartAnalysisRequestSchema = z.object({
+  actualExpenseSetId: z.string().min(1, "Select an actual expenses set"),
+  includeFiftyThirtyTwenty: z.boolean().default(true),
+  includeMonthlyExpenses: z.boolean().default(true),
+});
+
+export type SmartAnalysisResult = typeof smartAnalysisResults.$inferSelect;
+export type SmartAnalysisRequestInput = z.infer<typeof smartAnalysisRequestSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;

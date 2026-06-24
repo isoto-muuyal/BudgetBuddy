@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { promises as fs } from "fs";
 import multer from "multer";
-import path from "path";
 import { storage } from "./storage";
 import { authService } from "./services/auth";
 import { adminService } from "./services/admin";
@@ -11,35 +10,64 @@ import { aiService } from "./services/ai-service";
 import { fileProcessor } from "./services/file-processor";
 import { authenticateToken, type AuthenticatedRequest } from "./middleware/auth";
 import { authenticateAdminToken, type AuthenticatedAdminRequest } from "./middleware/admin-auth";
-import { loginSchema, signupSchema, incomeSchema, forgotPasswordSchema, resetPasswordSchema, contactFormSchema, debtInputSchema, debtUpdateSchema, recurringExpenseInputSchema, recurringExpenseUpdateSchema, recurringExpenseToggleSchema, pageContentUpdateSchema, PAGE_CONTENT_SLUGS } from "@shared/schema";
+import {
+  loginSchema,
+  signupSchema,
+  incomeSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  contactFormSchema,
+  debtInputSchema,
+  debtUpdateSchema,
+  recurringExpenseInputSchema,
+  recurringExpenseUpdateSchema,
+  recurringExpenseToggleSchema,
+  pageContentUpdateSchema,
+  PAGE_CONTENT_SLUGS,
+  incomeBreakdownInputSchema,
+  actualExpenseSetUpdateSchema,
+  smartAnalysisRequestSchema,
+  RECURRING_EXPENSE_FREQUENCIES,
+  type RecurringExpenseFrequency,
+  type ExpenseItem,
+} from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { logger } from "./services/logger";
-import { metricsService } from "./services/metrics-service";
 
-// Configure multer for file uploads
+// Configure multer for CSV uploads of actual expenses
 const upload = multer({
   dest: config.uploads.directory,
   limits: {
     fileSize: config.uploads.maxSize,
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
-    ];
-    
-    if (allowedTypes.includes(file.mimetype)) {
+    const allowedTypes = ['text/csv', 'application/vnd.ms-excel'];
+    const isCsvExtension = file.originalname.toLowerCase().endsWith('.csv');
+
+    if (allowedTypes.includes(file.mimetype) || isCsvExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only PDF and Excel files are allowed.'));
+      cb(new Error('Invalid file type. Only CSV files are allowed.'));
     }
   },
 });
+
+const FREQUENCY_MONTHLY_MULTIPLIERS: Record<RecurringExpenseFrequency, number> = {
+  daily: 365 / 12,
+  weekly: 52 / 12,
+  bi_weekly: 26 / 12,
+  monthly: 1,
+  semi_monthly: 2,
+  bi_monthly: 0.5,
+  yearly: 1 / 12,
+};
+
+function toMonthlyEquivalent(amount: number, frequency: RecurringExpenseFrequency): number {
+  return amount * (FREQUENCY_MONTHLY_MULTIPLIERS[frequency] ?? 1);
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const googleStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
@@ -263,133 +291,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File upload and analysis routes
-  app.post("/api/analysis/upload", authenticateToken, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+  // 50/30/20 income routes
+  app.get("/api/income", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const user = req.user;
-      if (!user.monthlyIncome) {
-        return res.status(400).json({ message: "Monthly income not set. Please set your income first." });
-      }
-
-      // Generate unique filename
-      const fileName = fileProcessor.generateFileName(user.email, req.file.originalname);
-      
-      // Save file with new name
-      const filePath = await fileProcessor.saveFile(req.file.buffer || await fs.readFile(req.file.path), fileName);
-
-      // Create budget analysis record
-      logger.info("Analysis upload accepted", {
-        traceId: req.traceId,
-        userId: user.id,
-        originalFileName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-      });
-      const monthlyIncome = parseFloat(user.monthlyIncome);
-      const analysis = await storage.createBudgetAnalysis({
-        userId: user.id,
-        fileName,
-        originalFileName: req.file.originalname,
-        monthlyIncome: monthlyIncome.toString(),
-        recommendedNeeds: (monthlyIncome * 0.5).toString(),
-        recommendedWants: (monthlyIncome * 0.3).toString(),
-        recommendedSavings: (monthlyIncome * 0.2).toString(),
-      });
-
-      // Start async processing
-      processFileAsync(user.id, analysis.id, filePath, monthlyIncome);
-
-      res.json({
-        message: "File uploaded successfully",
-        analysisId: analysis.id,
-      });
-    } catch (error: any) {
-      metricsService.increment("analysis_upload_failures_total");
-      logger.error("Upload failed", { traceId: req.traceId, error: error instanceof Error ? error.message : String(error) });
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get("/api/analysis", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
-      res.json(analyses);
+      const income = await storage.getIncome(req.user.id);
+      res.json(income ?? null);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/global-advice/latest", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/income", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const latestAdvice = await storage.getLatestGlobalAdviceByUser(req.user.id);
-      res.json(latestAdvice ?? null);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+      const input = incomeBreakdownInputSchema.parse(req.body);
+      const mainIncome = parseFloat(input.mainIncome) || 0;
+      const otherIncomeTotal = input.otherIncomes.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
+      const totalIncome = mainIncome + otherIncomeTotal;
 
-  app.get("/api/analysis/patterns", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const analyses = await storage.getBudgetAnalysesByUser(req.user.id);
-      const completed = analyses.filter((analysis) =>
-        analysis.analysisStatus === "completed" &&
-        analysis.actualNeeds &&
-        analysis.actualWants &&
-        analysis.actualSavings &&
-        analysis.recommendations
-      );
-
-      if (!completed.length) {
-        return res.json({ patterns: "Not enough completed analyses to detect meaningful patterns yet." });
-      }
-
-      const rows = completed.map((analysis) => {
-        const monthlyIncome = parseFloat(analysis.monthlyIncome || "0");
-        const actualNeeds = parseFloat(analysis.actualNeeds || "0");
-        const actualWants = parseFloat(analysis.actualWants || "0");
-        const actualSavings = parseFloat(analysis.actualSavings || "0");
-        const divisor = monthlyIncome || 1;
-
-        return {
-          uploadDate: analysis.uploadDate ? new Date(analysis.uploadDate).toISOString() : "",
-          monthlyIncome,
-          actualNeeds,
-          actualWants,
-          actualSavings,
-          needsPercent: (actualNeeds / divisor) * 100,
-          wantsPercent: (actualWants / divisor) * 100,
-          savingsPercent: (actualSavings / divisor) * 100,
-          recommendations: analysis.recommendations || "",
-        };
+      const income = await storage.upsertIncome(req.user.id, input, {
+        needs: (totalIncome * 0.5).toString(),
+        wants: (totalIncome * 0.3).toString(),
+        savings: (totalIncome * 0.2).toString(),
       });
 
-      const patterns = await aiService.analyzeHistoryPatterns(rows);
-      res.json({ patterns });
+      await storage.updateUserIncome(req.user.id, totalIncome.toString());
+
+      res.json(income);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Actual expense set routes
+  app.get("/api/actual-expense-sets", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const sets = await storage.listActualExpenseSets(req.user.id);
+      res.json(sets);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/actual-expense-sets/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const analysisId = req.params.id;
-      const analysis = await storage.getBudgetAnalysis(analysisId);
-
-      if (!analysis) {
-        return res.status(404).json({ message: "Analysis not found" });
+      const set = await storage.getActualExpenseSet(req.user.id, req.params.id);
+      if (!set) {
+        return res.status(404).json({ message: "Actual expense set not found" });
       }
-
-      if (analysis.userId !== req.user.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      res.json(analysis);
+      res.json(set);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post(
+    "/api/actual-expense-sets/upload",
+    authenticateToken,
+    upload.single("file"),
+    async (req: AuthenticatedRequest, res) => {
+      let filePath: string | undefined;
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const fileName = fileProcessor.generateFileName(req.user.email, req.file.originalname);
+        filePath = await fileProcessor.saveFile(req.file.buffer || (await fs.readFile(req.file.path)), fileName);
+
+        const rows = await fileProcessor.parseCsvRows(filePath);
+        const rawItems = rows.map((row) => {
+          const values = Object.values(row);
+          const keys = Object.keys(row).map((key) => key.toLowerCase());
+          const pick = (candidates: string[]) => {
+            const index = keys.findIndex((key) => candidates.some((candidate) => key.includes(candidate)));
+            return index >= 0 ? String(values[index] ?? "") : "";
+          };
+
+          return {
+            date: pick(["date"]),
+            description: pick(["description", "memo", "details"]),
+            business: pick(["business", "merchant", "payee", "vendor"]),
+            amount: pick(["amount", "value", "total"]),
+          };
+        });
+
+        const classified = await aiService.classifyActualExpenses(rawItems);
+        const name = req.body?.name && typeof req.body.name === "string" ? req.body.name : req.file.originalname;
+        const set = await storage.createActualExpenseSet(req.user.id, name, classified);
+
+        res.json(set);
+      } catch (error: any) {
+        logger.error("Actual expense upload failed", { traceId: req.traceId, error: error instanceof Error ? error.message : String(error) });
+        res.status(500).json({ message: error.message });
+      } finally {
+        if (filePath) {
+          await fileProcessor.deleteFile(filePath);
+        }
+      }
+    }
+  );
+
+  app.patch("/api/actual-expense-sets/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const updates = actualExpenseSetUpdateSchema.parse(req.body);
+      const set = await storage.updateActualExpenseSet(req.user.id, req.params.id, updates);
+      res.json(set);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Smart analysis routes
+  app.get("/api/smart-analysis", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const results = await storage.listSmartAnalysisResults(req.user.id);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/smart-analysis/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await storage.getSmartAnalysisResult(req.user.id, req.params.id);
+      if (!result) {
+        return res.status(404).json({ message: "Smart analysis result not found" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/smart-analysis", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const input = smartAnalysisRequestSchema.parse(req.body);
+      const expenseSet = await storage.getActualExpenseSet(req.user.id, input.actualExpenseSetId);
+      if (!expenseSet) {
+        return res.status(404).json({ message: "Actual expense set not found" });
+      }
+
+      const items = expenseSet.items as ExpenseItem[];
+
+      let fiftyThirtyTwenty: { needs: number; wants: number; savings: number; monthlyIncome: number } | undefined;
+      if (input.includeFiftyThirtyTwenty) {
+        const income = await storage.getIncome(req.user.id);
+        if (income) {
+          const monthlyIncome = parseFloat(income.mainIncome) +
+            (Array.isArray(income.otherIncomes)
+              ? (income.otherIncomes as Array<{ amount: string }>).reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+              : 0);
+          fiftyThirtyTwenty = {
+            needs: parseFloat(income.needs),
+            wants: parseFloat(income.wants),
+            savings: parseFloat(income.savings),
+            monthlyIncome,
+          };
+        }
+      }
+
+      let monthlyExpenses: { needs: number; wants: number; savings: number } | undefined;
+      if (input.includeMonthlyExpenses) {
+        const recurring = await storage.getRecurringExpensesByUser(req.user.id);
+        const totals = { needs: 0, wants: 0, savings: 0 };
+        for (const expense of recurring) {
+          if (!expense.enabled) continue;
+          const monthlyAmount = toMonthlyEquivalent(Number(expense.amount), expense.frequency as RecurringExpenseFrequency);
+          if (expense.category === "needs") totals.needs += monthlyAmount;
+          else if (expense.category === "wants") totals.wants += monthlyAmount;
+          else if (expense.category === "savings") totals.savings += monthlyAmount;
+        }
+        monthlyExpenses = totals;
+      }
+
+      const recommendations = await aiService.generateSmartAnalysisRecommendation({
+        items,
+        fiftyThirtyTwenty,
+        monthlyExpenses,
+      });
+
+      const snapshot = {
+        items,
+        fiftyThirtyTwenty: fiftyThirtyTwenty ?? null,
+        monthlyExpenses: monthlyExpenses ?? null,
+      };
+
+      const result = await storage.createSmartAnalysisResult(req.user.id, {
+        actualExpenseSetId: expenseSet.id,
+        includeFiftyThirtyTwenty: input.includeFiftyThirtyTwenty,
+        includeMonthlyExpenses: input.includeMonthlyExpenses,
+        snapshot,
+        recommendations,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   });
 
@@ -576,69 +673,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   return httpServer;
-}
-
-// Async file processing function
-async function processFileAsync(userId: string, analysisId: string, filePath: string, monthlyIncome: number) {
-  const started = Date.now();
-  try {
-    logger.info("Analysis processing started", { userId, analysisId });
-    metricsService.increment("analysis_jobs_started_total");
-
-    // Extract text from file
-    const textContent = await fileProcessor.processFile(filePath, path.basename(filePath));
-
-    const recurringExpenses = await storage.getRecurringExpensesByUser(userId);
-    
-    // Analyze with AI
-    const aiResult = await aiService.analyzeExpenses(textContent, monthlyIncome, {
-      userId,
-      analysisId,
-      runGlobalAdvisor: true,
-      recurringExpenses: recurringExpenses.map((expense) => ({
-        name: expense.name,
-        amount: Number(expense.amount),
-        frequency: expense.frequency,
-      })),
-    });
-    logger.info("AI analysis completed", {
-      userId,
-      analysisId,
-      expenseCount: aiResult.expenses.length,
-      hasGlobalAdvice: Boolean(aiResult.globalAdvice),
-    });
-
-    // Update analysis with results
-    await storage.updateBudgetAnalysis(analysisId, {
-      actualNeeds: aiResult.needs.toString(),
-      actualWants: aiResult.wants.toString(),
-      actualSavings: aiResult.savings.toString(),
-      actualUndefined: aiResult.undefined.toString(),
-      expenses: JSON.stringify(aiResult.expenses),
-      recommendations: aiResult.recommendations,
-      analysisStatus: "completed",
-    });
-
-    metricsService.increment("analysis_jobs_completed_total");
-    metricsService.observe("analysis_job_duration_seconds", { status: "completed" }, (Date.now() - started) / 1000, [1, 5, 10, 30, 60, 120, 300, 600]);
-    logger.info("Analysis processing completed", { userId, analysisId, durationMs: Date.now() - started });
-  } catch (error) {
-    metricsService.increment("analysis_jobs_failed_total");
-    metricsService.observe("analysis_job_duration_seconds", { status: "failed" }, (Date.now() - started) / 1000, [1, 5, 10, 30, 60, 120, 300, 600]);
-    logger.error("Analysis processing failed", {
-      userId,
-      analysisId,
-      durationMs: Date.now() - started,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    // Update analysis with error status
-    await storage.updateBudgetAnalysis(analysisId, {
-      analysisStatus: "failed",
-      recommendations: "Analysis failed. Please try uploading your file again or contact support if the issue persists.",
-    });
-  } finally {
-    // Clean up the uploaded file
-    await fileProcessor.deleteFile(filePath);
-  }
 }

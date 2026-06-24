@@ -10,6 +10,9 @@ import {
   analysisEmbeddings,
   globalAdviceSnapshots,
   pageContent,
+  incomes,
+  actualExpenseSets,
+  smartAnalysisResults,
   type User,
   type InsertUser,
   type BudgetAnalysis,
@@ -21,6 +24,11 @@ import {
   type AppVersion,
   type Admin,
   type PageContent,
+  type IncomeBreakdown,
+  type IncomeBreakdownInput,
+  type ExpenseItem,
+  type ActualExpenseSet,
+  type SmartAnalysisResult,
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
@@ -108,6 +116,38 @@ export interface IStorage {
   // Page content methods
   getPageContent(slug: string): Promise<PageContent | undefined>;
   upsertPageContent(slug: string, content: Record<string, unknown>): Promise<PageContent>;
+
+  // Income (50/30/20) methods
+  getIncome(userId: string): Promise<IncomeBreakdown | undefined>;
+  upsertIncome(
+    userId: string,
+    input: IncomeBreakdownInput,
+    computed: { needs: string; wants: string; savings: string }
+  ): Promise<IncomeBreakdown>;
+
+  // Actual expense set methods
+  listActualExpenseSets(userId: string): Promise<ActualExpenseSet[]>;
+  getActualExpenseSet(userId: string, id: string): Promise<ActualExpenseSet | undefined>;
+  createActualExpenseSet(userId: string, name: string, items: ExpenseItem[]): Promise<ActualExpenseSet>;
+  updateActualExpenseSet(
+    userId: string,
+    id: string,
+    updates: { name?: string; items: ExpenseItem[] }
+  ): Promise<ActualExpenseSet>;
+
+  // Smart analysis result methods
+  listSmartAnalysisResults(userId: string): Promise<SmartAnalysisResult[]>;
+  getSmartAnalysisResult(userId: string, id: string): Promise<SmartAnalysisResult | undefined>;
+  createSmartAnalysisResult(
+    userId: string,
+    data: {
+      actualExpenseSetId: string | null;
+      includeFiftyThirtyTwenty: boolean;
+      includeMonthlyExpenses: boolean;
+      snapshot: Record<string, unknown>;
+      recommendations: string;
+    }
+  ): Promise<SmartAnalysisResult>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -608,6 +648,145 @@ export class DatabaseStorage implements IStorage {
 
     if (!row) {
       throw new Error("Failed to save page content");
+    }
+
+    return row;
+  }
+
+  async getIncome(userId: string): Promise<IncomeBreakdown | undefined> {
+    const [row] = await db.select().from(incomes).where(eq(incomes.userId, userId));
+    return row || undefined;
+  }
+
+  async upsertIncome(
+    userId: string,
+    input: IncomeBreakdownInput,
+    computed: { needs: string; wants: string; savings: string }
+  ): Promise<IncomeBreakdown> {
+    const [row] = await db
+      .insert(incomes)
+      .values({
+        userId,
+        mainIncome: input.mainIncome,
+        otherIncomes: input.otherIncomes,
+        needs: computed.needs,
+        wants: computed.wants,
+        savings: computed.savings,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: incomes.userId,
+        set: {
+          mainIncome: input.mainIncome,
+          otherIncomes: input.otherIncomes,
+          needs: computed.needs,
+          wants: computed.wants,
+          savings: computed.savings,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to save income");
+    }
+
+    return row;
+  }
+
+  async listActualExpenseSets(userId: string): Promise<ActualExpenseSet[]> {
+    return await db
+      .select()
+      .from(actualExpenseSets)
+      .where(eq(actualExpenseSets.userId, userId))
+      .orderBy(desc(actualExpenseSets.createdAt));
+  }
+
+  async getActualExpenseSet(userId: string, id: string): Promise<ActualExpenseSet | undefined> {
+    const [row] = await db
+      .select()
+      .from(actualExpenseSets)
+      .where(and(eq(actualExpenseSets.id, id), eq(actualExpenseSets.userId, userId)));
+
+    return row || undefined;
+  }
+
+  async createActualExpenseSet(userId: string, name: string, items: ExpenseItem[]): Promise<ActualExpenseSet> {
+    const [row] = await db
+      .insert(actualExpenseSets)
+      .values({ userId, name, items })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to create actual expense set");
+    }
+
+    return row;
+  }
+
+  async updateActualExpenseSet(
+    userId: string,
+    id: string,
+    updates: { name?: string; items: ExpenseItem[] }
+  ): Promise<ActualExpenseSet> {
+    const [row] = await db
+      .update(actualExpenseSets)
+      .set({
+        ...(updates.name ? { name: updates.name } : {}),
+        items: updates.items,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(actualExpenseSets.id, id), eq(actualExpenseSets.userId, userId)))
+      .returning();
+
+    if (!row) {
+      throw new Error("Actual expense set not found");
+    }
+
+    return row;
+  }
+
+  async listSmartAnalysisResults(userId: string): Promise<SmartAnalysisResult[]> {
+    return await db
+      .select()
+      .from(smartAnalysisResults)
+      .where(eq(smartAnalysisResults.userId, userId))
+      .orderBy(desc(smartAnalysisResults.createdAt));
+  }
+
+  async getSmartAnalysisResult(userId: string, id: string): Promise<SmartAnalysisResult | undefined> {
+    const [row] = await db
+      .select()
+      .from(smartAnalysisResults)
+      .where(and(eq(smartAnalysisResults.id, id), eq(smartAnalysisResults.userId, userId)));
+
+    return row || undefined;
+  }
+
+  async createSmartAnalysisResult(
+    userId: string,
+    data: {
+      actualExpenseSetId: string | null;
+      includeFiftyThirtyTwenty: boolean;
+      includeMonthlyExpenses: boolean;
+      snapshot: Record<string, unknown>;
+      recommendations: string;
+    }
+  ): Promise<SmartAnalysisResult> {
+    const [row] = await db
+      .insert(smartAnalysisResults)
+      .values({
+        userId,
+        actualExpenseSetId: data.actualExpenseSetId,
+        includeFiftyThirtyTwenty: data.includeFiftyThirtyTwenty,
+        includeMonthlyExpenses: data.includeMonthlyExpenses,
+        snapshot: data.snapshot,
+        recommendations: data.recommendations,
+      })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to create smart analysis result");
     }
 
     return row;

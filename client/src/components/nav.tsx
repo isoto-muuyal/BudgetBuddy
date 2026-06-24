@@ -65,6 +65,13 @@ export default function Navigation() {
             {isAuthenticated && (
               <div className="hidden md:flex items-center space-x-4">
                 <Link
+                  href="/fifty-thirty-twenty"
+                  className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
+                  data-testid="link-fifty-thirty-twenty"
+                >
+                  {t("nav.fiftyThirtyTwenty")}
+                </Link>
+                <Link
                   href="/budget"
                   className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
                   data-testid="link-budget"
@@ -74,9 +81,9 @@ export default function Navigation() {
                 <Link
                   href="/income"
                   className="text-sm font-medium text-slate-300 hover:text-amber-300 transition-colors"
-                  data-testid="link-budget-analysis"
+                  data-testid="link-smart-analysis"
                 >
-                  {t("nav.budgetAnalysis")}
+                  {t("nav.smartAnalysis")}
                 </Link>
                 <Link
                   href="/debt"

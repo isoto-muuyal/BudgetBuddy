@@ -7,9 +7,9 @@ import { ThemeProvider } from "next-themes";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Income from "@/pages/income";
+import FiftyThirtyTwenty from "@/pages/fifty-thirty-twenty";
+import SmartAnalysisResults from "@/pages/smart-analysis-results";
 import Budget from "@/pages/budget";
-import Upload from "@/pages/upload";
-import Results from "@/pages/results";
 import Debt from "@/pages/debt";
 import About from "@/pages/about";
 import HowItWorks from "@/pages/how-it-works";
@@ -35,10 +35,10 @@ function Router() {
         <Route path="/" component={Login} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
-        <Route path="/income" component={Income} />
+        <Route path="/fifty-thirty-twenty" component={FiftyThirtyTwenty} />
         <Route path="/budget" component={Budget} />
-        <Route path="/upload" component={Upload} />
-        <Route path="/results/:id" component={Results} />
+        <Route path="/income" component={Income} />
+        <Route path="/smart-analysis/:id" component={SmartAnalysisResults} />
         <Route path="/debt" component={Debt} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />

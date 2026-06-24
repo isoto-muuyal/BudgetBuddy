@@ -86,6 +86,25 @@ export class FileProcessor {
     });
   }
 
+  async parseCsvRows(filePath: string): Promise<Array<Record<string, string>>> {
+    return new Promise((resolve, reject) => {
+      const rows: Array<Record<string, string>> = [];
+
+      createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (row: Record<string, string>) => {
+          rows.push(row);
+        })
+        .on('end', () => {
+          resolve(rows);
+        })
+        .on('error', (error) => {
+          console.error("CSV parsing error:", error);
+          reject(new Error("Failed to parse CSV file"));
+        });
+    });
+  }
+
   async ensureUploadsDirectory(): Promise<void> {
     try {
       await fs.mkdir(config.uploads.directory, { recursive: true });

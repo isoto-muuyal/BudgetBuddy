@@ -6,6 +6,13 @@ import { vectorStoreService } from "./vector-store-service";
 import { mcpClientService } from "./mcp-client-service";
 import { logger } from "./logger";
 import { metricsService } from "./metrics-service";
+import {
+  EXPENSE_ITEM_TYPES,
+  EXPENSE_ITEM_CATEGORIES,
+  type ExpenseItem,
+  type ExpenseItemType,
+  type ExpenseItemCategory,
+} from "@shared/schema";
 
 export const CATEGORIZER_AGENT = "CATEGORIZER_AGENT";
 export const CATEGORIZER_TOOL = "CATEGORIZER_TOOL";
@@ -1083,6 +1090,245 @@ Keep the response concise and actionable with bullet points.
     }
 
     return "Other";
+  }
+
+  async classifyActualExpenses(rawItems: Partial<ExpenseItem>[]): Promise<ExpenseItem[]> {
+    if (!rawItems.length) {
+      return [];
+    }
+
+    try {
+      const responseText = await this.runJsonCompletion({
+        systemPrompt:
+          "You are a financial transaction classification expert. For each expense, decide its type (one of: " +
+          EXPENSE_ITEM_TYPES.join(", ") +
+          ") and its category (one of: " +
+          EXPENSE_ITEM_CATEGORIES.join(", ") +
+          `). If you cannot determine the type or category with confidence, use "other". Always return ONLY valid JSON.`,
+        userPrompt: this.buildExpenseClassificationPrompt(rawItems),
+        maxTokens: 4096,
+        temperature: 0.1,
+      });
+
+      return this.parseExpenseClassificationResponse(responseText, rawItems);
+    } catch (error) {
+      metricsService.increment("ai_tool_failures_total", { tool: "classify_actual_expenses" });
+      logger.error("Expense classification failed; using fallback", { error: this.errorMessage(error) });
+      return rawItems.map((item) => this.ruleBasedExpenseClassification(item));
+    }
+  }
+
+  async generateSmartAnalysisRecommendation(input: {
+    items: ExpenseItem[];
+    fiftyThirtyTwenty?: { needs: number; wants: number; savings: number; monthlyIncome: number };
+    monthlyExpenses?: { needs: number; wants: number; savings: number };
+  }): Promise<string> {
+    try {
+      const responseText = await this.runTextCompletion({
+        systemPrompt:
+          "You are a financial analyst. Compare a user's actual expenses against their 50/30/20 targets and/or expected recurring expenses, then provide clear, actionable recommendations.",
+        userPrompt: this.buildSmartAnalysisPrompt(input),
+        maxTokens: 1024,
+        temperature: 0.4,
+      });
+
+      return this.parseRecommendationsResponse(responseText);
+    } catch (error) {
+      metricsService.increment("ai_tool_failures_total", { tool: "smart_analysis_recommendation" });
+      logger.error("Smart analysis recommendation failed; using fallback", { error: this.errorMessage(error) });
+      return this.buildRuleBasedSmartAnalysisRecommendation(input);
+    }
+  }
+
+  private buildExpenseClassificationPrompt(rawItems: Partial<ExpenseItem>[]): string {
+    return `
+Classify each of the following expenses according to:
+- type: one of ${EXPENSE_ITEM_TYPES.join(", ")} (use "other" if uncertain)
+- category: one of ${EXPENSE_ITEM_CATEGORIES.join(", ")} (use "other" if uncertain)
+
+Expenses:
+${JSON.stringify(rawItems, null, 2)}
+
+Return ONLY a JSON object in this exact format:
+{
+  "expenses": [
+    {
+      "date": "[date if present, otherwise empty string]",
+      "description": "[description]",
+      "business": "[business/merchant name]",
+      "amount": "[amount as string]",
+      "category": "[one of ${EXPENSE_ITEM_CATEGORIES.join(", ")}]",
+      "type": "[one of ${EXPENSE_ITEM_TYPES.join(", ")}]"
+    }
+  ]
+}
+
+Return exactly ${rawItems.length} expenses, preserving their original order.
+`;
+  }
+
+  private parseExpenseClassificationResponse(
+    responseText: string,
+    fallbackItems: Partial<ExpenseItem>[]
+  ): ExpenseItem[] {
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No valid JSON found in expense classification response");
+      }
+
+      const parsed: { expenses?: Array<Partial<ExpenseItem>> } = JSON.parse(
+        jsonMatch[0].replace(/[ --]/g, " ").trim()
+      );
+
+      const classified = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+      if (!classified.length) {
+        throw new Error("Expense classification response contained no expenses");
+      }
+
+      return fallbackItems.map((item, index) => this.normalizeExpenseItem(classified[index] ?? item, item));
+    } catch (error) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const filePath = `./failed_ai_responses/expense_classification_${timestamp}.txt`;
+      fs.mkdirSync("./failed_ai_responses", { recursive: true });
+      fs.writeFileSync(filePath, responseText);
+      logger.error("Failed to parse expense classification response", { error: this.errorMessage(error), filePath });
+      return fallbackItems.map((item) => this.ruleBasedExpenseClassification(item));
+    }
+  }
+
+  private normalizeExpenseItem(value: Partial<ExpenseItem>, fallback: Partial<ExpenseItem>): ExpenseItem {
+    const type = EXPENSE_ITEM_TYPES.includes(value.type as ExpenseItemType) ? (value.type as ExpenseItemType) : "other";
+    const category = EXPENSE_ITEM_CATEGORIES.includes(value.category as ExpenseItemCategory)
+      ? (value.category as ExpenseItemCategory)
+      : "other";
+
+    return {
+      date: typeof value.date === "string" ? value.date : fallback.date || "",
+      description: typeof value.description === "string" ? value.description : fallback.description || "",
+      business: typeof value.business === "string" ? value.business : fallback.business || "",
+      amount: typeof value.amount === "string" ? value.amount : String(fallback.amount ?? "0"),
+      category,
+      type,
+    };
+  }
+
+  private ruleBasedExpenseClassification(item: Partial<ExpenseItem>): ExpenseItem {
+    const text = `${item.description || ""} ${item.business || ""}`.toLowerCase();
+
+    let category: ExpenseItemCategory = "other";
+    if (text.includes("restaurant") || text.includes("dining")) category = "restaurant";
+    else if (text.includes("movie") || text.includes("cinema")) category = "movies";
+    else if (text.includes("entertainment") || text.includes("netflix") || text.includes("spotify")) category = "entertainment";
+    else if (text.includes("cloth") || text.includes("apparel")) category = "clothes";
+    else if (text.includes("grocery") || text.includes("market")) category = "groceries";
+    else if (text.includes("gas") || text.includes("fuel")) category = "gas";
+    else if (text.includes("saving") || text.includes("invest")) category = "savings";
+
+    let type: ExpenseItemType = "other";
+    if (category === "savings") type = "savings";
+    else if (["groceries", "gas"].includes(category)) type = "needs";
+    else if (["restaurant", "entertainment", "movies", "clothes"].includes(category)) type = "wants";
+
+    return {
+      date: item.date || "",
+      description: item.description || "",
+      business: item.business || "",
+      amount: String(item.amount ?? "0"),
+      category,
+      type,
+    };
+  }
+
+  private buildSmartAnalysisPrompt(input: {
+    items: ExpenseItem[];
+    fiftyThirtyTwenty?: { needs: number; wants: number; savings: number; monthlyIncome: number };
+    monthlyExpenses?: { needs: number; wants: number; savings: number };
+  }): string {
+    const totals = input.items.reduce(
+      (acc, item) => {
+        const amount = Number(item.amount) || 0;
+        if (item.type === "needs") acc.needs += amount;
+        else if (item.type === "wants") acc.wants += amount;
+        else if (item.type === "savings") acc.savings += amount;
+        else acc.other += amount;
+        return acc;
+      },
+      { needs: 0, wants: 0, savings: 0, other: 0 }
+    );
+
+    const targetSection = input.fiftyThirtyTwenty
+      ? `
+50/30/20 Targets (based on monthly income of $${input.fiftyThirtyTwenty.monthlyIncome.toFixed(2)}):
+- Needs (50%): $${input.fiftyThirtyTwenty.needs.toFixed(2)}
+- Wants (30%): $${input.fiftyThirtyTwenty.wants.toFixed(2)}
+- Savings (20%): $${input.fiftyThirtyTwenty.savings.toFixed(2)}
+`
+      : "";
+
+    const expectedSection = input.monthlyExpenses
+      ? `
+Expected Monthly Recurring Expenses:
+- Needs: $${input.monthlyExpenses.needs.toFixed(2)}
+- Wants: $${input.monthlyExpenses.wants.toFixed(2)}
+- Savings: $${input.monthlyExpenses.savings.toFixed(2)}
+`
+      : "";
+
+    return `
+Analyze the user's actual expenses against the targets provided below.
+${targetSection}${expectedSection}
+Actual Spending (from uploaded expenses):
+- Needs: $${totals.needs.toFixed(2)}
+- Wants: $${totals.wants.toFixed(2)}
+- Savings: $${totals.savings.toFixed(2)}
+- Other/Unclassified: $${totals.other.toFixed(2)}
+
+Actual Expense Items:
+${JSON.stringify(input.items, null, 2)}
+
+Provide actionable recommendations comparing actual spending to the targets above. Focus on overspending, under-saving, and where Wants can be reduced and redirected.
+`;
+  }
+
+  private buildRuleBasedSmartAnalysisRecommendation(input: {
+    items: ExpenseItem[];
+    fiftyThirtyTwenty?: { needs: number; wants: number; savings: number; monthlyIncome: number };
+    monthlyExpenses?: { needs: number; wants: number; savings: number };
+  }): string {
+    const totals = input.items.reduce(
+      (acc, item) => {
+        const amount = Number(item.amount) || 0;
+        if (item.type === "needs") acc.needs += amount;
+        else if (item.type === "wants") acc.wants += amount;
+        else if (item.type === "savings") acc.savings += amount;
+        return acc;
+      },
+      { needs: 0, wants: 0, savings: 0 }
+    );
+
+    const lines: string[] = [];
+    if (input.fiftyThirtyTwenty) {
+      lines.push(
+        totals.needs > input.fiftyThirtyTwenty.needs
+          ? `Your needs spending ($${totals.needs.toFixed(2)}) is above your 50% target ($${input.fiftyThirtyTwenty.needs.toFixed(2)}).`
+          : `Your needs spending is within your 50% target.`
+      );
+      lines.push(
+        totals.wants > input.fiftyThirtyTwenty.wants
+          ? `Your wants spending ($${totals.wants.toFixed(2)}) is above your 30% target ($${input.fiftyThirtyTwenty.wants.toFixed(2)}).`
+          : `Your wants spending is within your 30% target.`
+      );
+      lines.push(
+        totals.savings < input.fiftyThirtyTwenty.savings
+          ? `Your savings ($${totals.savings.toFixed(2)}) are below your 20% target ($${input.fiftyThirtyTwenty.savings.toFixed(2)}).`
+          : `Your savings meet or exceed your 20% target.`
+      );
+    } else {
+      lines.push("Add your 50/30/20 income breakdown for a target-based comparison.");
+    }
+
+    return lines.join("\n");
   }
 }
 
