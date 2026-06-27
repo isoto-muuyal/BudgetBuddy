@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import bcrypt from "bcrypt";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
+import { decrypt } from "./utils/encryption";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
@@ -219,6 +220,112 @@ export async function ensureDatabaseSchema(): Promise<void> {
         created_at timestamp DEFAULT now() NOT NULL
       )
     `);
+    await pool.query(`
+      ALTER TABLE smart_analysis_results
+      ADD COLUMN IF NOT EXISTS legacy_analysis_id varchar REFERENCES budget_analyses(id)
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS smart_analysis_results_legacy_analysis_id_idx
+      ON smart_analysis_results (legacy_analysis_id)
+      WHERE legacy_analysis_id IS NOT NULL
+    `);
+    await migrateLegacyBudgetAnalyses();
+  };
+
+  // Maps the old free-form AI "subcategory" strings to the new fixed expense-item category enum.
+  const LEGACY_SUBCATEGORY_TO_CATEGORY: Record<string, schema.ExpenseItemCategory> = {
+    groceries: "groceries",
+    gas: "gas",
+    dining: "restaurant",
+    restaurant: "restaurant",
+    entertainment: "entertainment",
+    netflix: "entertainment",
+    subscriptions: "entertainment",
+    shopping: "clothes",
+    savings: "savings",
+    investment: "savings",
+    transfer: "savings",
+    deposit: "savings",
+    "extra debt payment": "savings",
+  };
+
+  const LEGACY_CATEGORY_TO_TYPE: Record<string, schema.ExpenseItemType> = {
+    "50%": "needs",
+    "30%": "wants",
+    "20%": "savings",
+    undefined: "other",
+  };
+
+  // One-time, idempotent migration: copies completed pre-redesign budget_analyses
+  // reports into the new actual_expense_sets / smart_analysis_results tables so
+  // they remain visible in the Smart Analysis history. Old rows are left in place.
+  const migrateLegacyBudgetAnalyses = async () => {
+    const { rows: legacyRows } = await pool.query(`
+      SELECT ba.* FROM budget_analyses ba
+      WHERE ba.analysis_status = 'completed'
+        AND NOT EXISTS (
+          SELECT 1 FROM smart_analysis_results sar WHERE sar.legacy_analysis_id = ba.id
+        )
+    `);
+
+    for (const row of legacyRows) {
+      let legacyItems: Array<{ description?: string; amount?: number | string; category?: string; subcategory?: string }> = [];
+      try {
+        const decrypted = row.expenses ? decrypt(row.expenses) : null;
+        const parsed = decrypted ? JSON.parse(decrypted) : [];
+        legacyItems = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        legacyItems = [];
+      }
+
+      const items: schema.ExpenseItem[] = legacyItems.map((item) => ({
+        date: "",
+        description: item.description ?? "",
+        business: "",
+        amount: String(item.amount ?? "0"),
+        category: LEGACY_SUBCATEGORY_TO_CATEGORY[item.subcategory ?? ""] ?? "other",
+        type: LEGACY_CATEGORY_TO_TYPE[item.category ?? ""] ?? "other",
+      }));
+
+      const uploadDate = row.upload_date ? new Date(row.upload_date) : new Date();
+      const [expenseSet] = (
+        await pool.query(
+          `INSERT INTO actual_expense_sets (user_id, name, items)
+           VALUES ($1, $2, $3)
+           RETURNING id`,
+          [row.user_id, `Imported - ${row.original_file_name || uploadDate.toLocaleDateString()}`, JSON.stringify(items)]
+        )
+      ).rows;
+
+      let recommendations = "";
+      try {
+        recommendations = row.recommendations ? decrypt(row.recommendations) : "";
+      } catch {
+        recommendations = "";
+      }
+
+      const snapshot = {
+        items,
+        fiftyThirtyTwenty: {
+          needs: Number(row.recommended_needs ?? 0),
+          wants: Number(row.recommended_wants ?? 0),
+          savings: Number(row.recommended_savings ?? 0),
+          monthlyIncome: Number(row.monthly_income ?? 0),
+        },
+        monthlyExpenses: null,
+      };
+
+      await pool.query(
+        `INSERT INTO smart_analysis_results
+           (user_id, actual_expense_set_id, include_fifty_thirty_twenty, include_monthly_expenses, snapshot, recommendations, created_at, legacy_analysis_id)
+         VALUES ($1, $2, true, false, $3, $4, $5, $6)`,
+        [row.user_id, expenseSet.id, JSON.stringify(snapshot), recommendations, uploadDate, row.id]
+      );
+    }
+
+    if (legacyRows.length > 0) {
+      console.log(`Migrated ${legacyRows.length} legacy budget analysis report(s) into smart_analysis_results.`);
+    }
   };
 
   const ensureAnalysisIntelligenceTables = async () => {

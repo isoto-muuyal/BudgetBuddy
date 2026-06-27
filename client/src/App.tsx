@@ -1,5 +1,6 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
+import { queryClient, getAuthToken } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,7 +27,17 @@ import AdminPage from "@/pages/admin";
 import VisitTracker from "@/components/visit-tracker";
 
 
+const AUTH_ONLY_PAGES = ["/", "/login", "/signup"];
+
 function Router() {
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (getAuthToken() && AUTH_ONLY_PAGES.includes(location)) {
+      setLocation("/income");
+    }
+  }, [location, setLocation]);
+
   return (
     <div className="min-h-screen">
       <Navigation />
