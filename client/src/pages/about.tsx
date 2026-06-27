@@ -55,10 +55,10 @@ export default function About() {
   return (
     <div className="max-w-4xl mx-auto p-6 pt-8">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4" data-testid="text-about-title">
+        <h1 className="text-4xl font-bold text-white mb-4" data-testid="text-about-title">
           {get("title", "about.title")}
         </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto" data-testid="text-about-description">
+        <p className="text-xl text-slate-200 max-w-2xl mx-auto" data-testid="text-about-description">
           {get("subtitle", "about.subtitle")}
         </p>
       </div>

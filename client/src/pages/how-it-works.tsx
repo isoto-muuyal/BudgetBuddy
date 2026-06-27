@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Upload, PieChart, TrendingUp } from "lucide-react";
+import { UserPlus, Upload, PieChart, TrendingUp, BadgeInfo } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
@@ -16,6 +16,8 @@ type HowItWorksContent = {
   step3Body: string;
   step4Title: string;
   step4Body: string;
+  step5Title: string;
+  step5Body: string;
   ctaTitle: string;
   ctaBody: string;
   ctaButton: string;
@@ -35,15 +37,16 @@ export default function HowItWorks() {
     { icon: Upload, title: get("step2Title", "howItWorks.step2Title"), body: get("step2Body", "howItWorks.step2Body"), color: "text-purple-500" },
     { icon: PieChart, title: get("step3Title", "howItWorks.step3Title"), body: get("step3Body", "howItWorks.step3Body"), color: "text-green-500" },
     { icon: TrendingUp, title: get("step4Title", "howItWorks.step4Title"), body: get("step4Body", "howItWorks.step4Body"), color: "text-amber-500" },
+    { icon: BadgeInfo, title: get("step5Title", "howItWorks.step5Title"), body: get("step5Body", "howItWorks.step5Body"), color: "text-amber-500" },
   ];
 
   return (
     <div className="max-w-4xl mx-auto p-6 pt-8">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4" data-testid="text-how-it-works-title">
+        <h1 className="text-4xl font-bold text-white mb-4" data-testid="text-how-it-works-title">
           {get("title", "howItWorks.title")}
         </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto" data-testid="text-how-it-works-subtitle">
+        <p className="text-xl text-slate-200 max-w-2xl mx-auto" data-testid="text-how-it-works-subtitle">
           {get("subtitle", "howItWorks.subtitle")}
         </p>
       </div>
