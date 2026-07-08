@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ArrowDownUp, BadgeDollarSign, CalendarCheck, Plus, Save, Target, Trash2, WalletCards } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface DebtDashboardProps {
 
 export default function DebtDashboard({ monthlyIncome = 0 }: DebtDashboardProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [strategy, setStrategy] = useState<DebtStrategy>("hybrid");
   const [extraPayment, setExtraPayment] = useState("100");
   const [debtForm, setDebtForm] = useState({
@@ -75,6 +77,11 @@ export default function DebtDashboard({ monthlyIncome = 0 }: DebtDashboardProps)
   );
 
   const dti = monthlyIncome ? (plan.minimumPaymentTotal / monthlyIncome) * 100 : 0;
+  const motivationalQuote = useMemo(() => {
+    const quotes = t("debt.motivationalQuotes", { returnObjects: true }) as string[];
+    if (!Array.isArray(quotes) || quotes.length === 0) return "";
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  }, [t]);
   const payoffChart = plan.months.slice(0, 18).map((month) => ({
     month: `M${month.month}`,
     balance: Number(month.totalBalance.toFixed(2)),
@@ -96,6 +103,8 @@ export default function DebtDashboard({ monthlyIncome = 0 }: DebtDashboardProps)
 
   return (
     <div className="space-y-5">
+      <DebtHealthMeter dti={dti} hasIncome={monthlyIncome > 0} quote={motivationalQuote} />
+
       <div className="grid gap-4 lg:grid-cols-4">
         <MetricPanel
           icon={<WalletCards className="h-4 w-4" />}
@@ -313,6 +322,65 @@ function MetricPanel({ icon, label, value, detail }: { icon: ReactNode; label: s
         <div className="text-xs text-slate-400">{label}</div>
         <div className="mt-1 truncate text-2xl font-semibold">{value}</div>
         <div className="mt-1 text-xs text-slate-500">{detail}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type DebtHealthStatus = "healthy" | "moderate" | "risky" | "critical";
+
+function getDebtHealthStatus(dti: number): DebtHealthStatus {
+  if (dti < 20) return "healthy";
+  if (dti < 36) return "moderate";
+  if (dti < 43) return "risky";
+  return "critical";
+}
+
+const STATUS_TEXT_COLOR: Record<DebtHealthStatus, string> = {
+  healthy: "text-emerald-400",
+  moderate: "text-amber-400",
+  risky: "text-orange-400",
+  critical: "text-red-400",
+};
+
+function DebtHealthMeter({ dti, hasIncome, quote }: { dti: number; hasIncome: boolean; quote: string }) {
+  const { t } = useTranslation();
+  const status = getDebtHealthStatus(dti);
+  const markerPosition = Math.min(100, Math.max(0, dti));
+
+  return (
+    <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
+      <CardContent className="p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs text-slate-400">{t("debt.meter.title")}</div>
+            <div className={`mt-1 text-2xl font-semibold ${STATUS_TEXT_COLOR[status]}`}>
+              {t(`debt.meter.status.${status}`)}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {hasIncome ? t("debt.meter.detail", { percent: dti.toFixed(1) }) : t("debt.meter.noIncome")}
+            </div>
+          </div>
+          <div className="md:w-80">
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500">
+              {hasIncome && (
+                <div
+                  className="absolute top-0 h-full w-0.5 bg-white shadow-[0_0_4px_rgba(255,255,255,0.9)]"
+                  style={{ left: `${markerPosition}%` }}
+                />
+              )}
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+              <span>0%</span>
+              <span>20%</span>
+              <span>36%</span>
+              <span>43%+</span>
+            </div>
+          </div>
+        </div>
+        {quote && (
+          <p className="mt-4 border-t border-white/10 pt-4 text-sm italic text-slate-300">"{quote}"</p>
+        )}
       </CardContent>
     </Card>
   );
