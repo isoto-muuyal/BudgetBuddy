@@ -22,6 +22,9 @@ import {
   recurringExpenseInputSchema,
   recurringExpenseUpdateSchema,
   recurringExpenseToggleSchema,
+  payPeriodExpenseInputSchema,
+  payPeriodExpenseUpdateSchema,
+  payPeriodExpenseToggleSchema,
   pageContentUpdateSchema,
   PAGE_CONTENT_SLUGS,
   incomeBreakdownInputSchema,
@@ -588,6 +591,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteRecurringExpense(req.user.id, req.params.id);
       res.json({ message: "Recurring expense deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/pay-period-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenses = await storage.getActivePayPeriodExpensesByUser(req.user.id);
+      res.json(expenses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/pay-period-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenseData = payPeriodExpenseInputSchema.parse(req.body);
+      const expense = await storage.createPayPeriodExpense(req.user.id, {
+        name: expenseData.name,
+        amount: expenseData.amount,
+        category: expenseData.category,
+        sourceRecurringExpenseId: expenseData.sourceRecurringExpenseId ?? null,
+      });
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/pay-period-expenses/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const expenseData = payPeriodExpenseUpdateSchema.parse(req.body);
+      const expense = await storage.updatePayPeriodExpense(req.user.id, req.params.id, {
+        name: expenseData.name,
+        amount: expenseData.amount,
+        category: expenseData.category,
+        sourceRecurringExpenseId: expenseData.sourceRecurringExpenseId ?? null,
+      });
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/pay-period-expenses/:id/toggle", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { paid } = payPeriodExpenseToggleSchema.parse(req.body);
+      const expense = await storage.togglePayPeriodExpense(req.user.id, req.params.id, paid);
+      res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/pay-period-expenses/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deletePayPeriodExpense(req.user.id, req.params.id);
+      res.json({ message: "Pay period expense deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/pay-period-expenses/reset", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.archiveAllPayPeriodExpenses(req.user.id);
+      res.json({ message: "Pay period reset" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -107,6 +107,18 @@ export const recurringExpenses = pgTable("recurring_expenses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const payPeriodExpenses = pgTable("pay_period_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  category: text("category").notNull().default("wants"),
+  paid: boolean("paid").notNull().default(false),
+  sourceRecurringExpenseId: varchar("source_recurring_expense_id").references(() => recurringExpenses.id),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const appVersions = pgTable("app_versions", {
   id: serial("id").primaryKey(),
   version: text("version").notNull(),
@@ -188,6 +200,26 @@ export const recurringExpenseUpdateSchema = recurringExpenseInputSchema;
 
 export const recurringExpenseToggleSchema = z.object({
   enabled: z.boolean(),
+});
+
+export const insertPayPeriodExpenseSchema = createInsertSchema(payPeriodExpenses).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+  archivedAt: true,
+});
+
+export const payPeriodExpenseInputSchema = z.object({
+  name: z.string().min(1, "Expense name is required"),
+  amount: z.string().min(1, "Amount is required"),
+  category: z.enum(RECURRING_EXPENSE_CATEGORIES),
+  sourceRecurringExpenseId: z.string().optional().nullable(),
+});
+
+export const payPeriodExpenseUpdateSchema = payPeriodExpenseInputSchema;
+
+export const payPeriodExpenseToggleSchema = z.object({
+  paid: z.boolean(),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -320,6 +352,10 @@ export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
 export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
 export type RecurringExpenseToggleInput = z.infer<typeof recurringExpenseToggleSchema>;
+export type PayPeriodExpense = typeof payPeriodExpenses.$inferSelect;
+export type InsertPayPeriodExpense = z.infer<typeof insertPayPeriodExpenseSchema>;
+export type PayPeriodExpenseInput = z.infer<typeof payPeriodExpenseInputSchema>;
+export type PayPeriodExpenseToggleInput = z.infer<typeof payPeriodExpenseToggleSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ContactFormInput = z.infer<typeof contactFormSchema>;

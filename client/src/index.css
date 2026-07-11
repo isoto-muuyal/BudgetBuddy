@@ -27,6 +27,7 @@
   --brand-dark: hsl(224 76% 48%);
   --brand-light: hsl(262 68% 70%);
   --needs-color: hsl(134 61% 41%);
+  --paid-color: hsl(142 71% 45%);
   --wants-color: hsl(217 91% 60%);
   --savings-color: hsl(262 83% 58%);
   --undefined-color: hsl(25 95% 53%);
@@ -108,6 +109,11 @@
 
   .needs-text {
     color: hsl(var(--needs-color));
+  }
+
+  .paid-bg {
+    background-color: hsl(var(--paid-color) / 0.15);
+    border-color: hsl(var(--paid-color) / 0.3);
   }
 
   .wants-bg {

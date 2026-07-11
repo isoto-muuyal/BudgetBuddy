@@ -5,6 +5,7 @@ import {
   budgetAnalyses,
   debts,
   recurringExpenses,
+  payPeriodExpenses,
   appVersions,
   admins,
   analysisEmbeddings,
@@ -21,6 +22,8 @@ import {
   type InsertDebt,
   type RecurringExpense,
   type InsertRecurringExpense,
+  type PayPeriodExpense,
+  type InsertPayPeriodExpense,
   type AppVersion,
   type Admin,
   type PageContent,
@@ -31,7 +34,7 @@ import {
   type SmartAnalysisResult,
 } from "@shared/schema";
 import { db } from "./db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
@@ -105,6 +108,14 @@ export interface IStorage {
   updateRecurringExpense(userId: string, expenseId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
   toggleRecurringExpense(userId: string, expenseId: string, enabled: boolean): Promise<RecurringExpense>;
   deleteRecurringExpense(userId: string, expenseId: string): Promise<void>;
+
+  // Pay period expense methods
+  getActivePayPeriodExpensesByUser(userId: string): Promise<PayPeriodExpense[]>;
+  createPayPeriodExpense(userId: string, expense: InsertPayPeriodExpense): Promise<PayPeriodExpense>;
+  updatePayPeriodExpense(userId: string, expenseId: string, expense: InsertPayPeriodExpense): Promise<PayPeriodExpense>;
+  togglePayPeriodExpense(userId: string, expenseId: string, paid: boolean): Promise<PayPeriodExpense>;
+  deletePayPeriodExpense(userId: string, expenseId: string): Promise<void>;
+  archiveAllPayPeriodExpenses(userId: string): Promise<void>;
 
   // App version methods
   getLatestAppVersion(): Promise<AppVersion>;
@@ -563,6 +574,70 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(recurringExpenses)
       .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)));
+  }
+
+  async getActivePayPeriodExpensesByUser(userId: string): Promise<PayPeriodExpense[]> {
+    return await db
+      .select()
+      .from(payPeriodExpenses)
+      .where(and(eq(payPeriodExpenses.userId, userId), isNull(payPeriodExpenses.archivedAt)));
+  }
+
+  async createPayPeriodExpense(userId: string, expenseInput: InsertPayPeriodExpense): Promise<PayPeriodExpense> {
+    const [expense] = await db
+      .insert(payPeriodExpenses)
+      .values({ ...expenseInput, userId })
+      .returning();
+
+    if (!expense) {
+      throw new Error("Failed to create pay period expense");
+    }
+    return expense;
+  }
+
+  async updatePayPeriodExpense(
+    userId: string,
+    expenseId: string,
+    expenseInput: InsertPayPeriodExpense
+  ): Promise<PayPeriodExpense> {
+    const [expense] = await db
+      .update(payPeriodExpenses)
+      .set(expenseInput)
+      .where(and(eq(payPeriodExpenses.id, expenseId), eq(payPeriodExpenses.userId, userId)))
+      .returning();
+
+    if (!expense) {
+      throw new Error("Pay period expense not found");
+    }
+
+    return expense;
+  }
+
+  async togglePayPeriodExpense(userId: string, expenseId: string, paid: boolean): Promise<PayPeriodExpense> {
+    const [expense] = await db
+      .update(payPeriodExpenses)
+      .set({ paid })
+      .where(and(eq(payPeriodExpenses.id, expenseId), eq(payPeriodExpenses.userId, userId)))
+      .returning();
+
+    if (!expense) {
+      throw new Error("Pay period expense not found");
+    }
+
+    return expense;
+  }
+
+  async deletePayPeriodExpense(userId: string, expenseId: string): Promise<void> {
+    await db
+      .delete(payPeriodExpenses)
+      .where(and(eq(payPeriodExpenses.id, expenseId), eq(payPeriodExpenses.userId, userId)));
+  }
+
+  async archiveAllPayPeriodExpenses(userId: string): Promise<void> {
+    await db
+      .update(payPeriodExpenses)
+      .set({ archivedAt: new Date() })
+      .where(and(eq(payPeriodExpenses.userId, userId), isNull(payPeriodExpenses.archivedAt)));
   }
 
   private getNextPatchVersion(version: string): string {

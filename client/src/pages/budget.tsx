@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { HandCoins } from "lucide-react";
 import RecurringExpensesDashboard from "@/components/recurring-expenses-dashboard";
+import CurrentPayPeriodDashboard from "@/components/current-pay-period-dashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "react-i18next";
 
 export default function Budget() {
@@ -30,7 +32,28 @@ export default function Budget() {
           </div>
         </div>
 
-        <RecurringExpensesDashboard monthlyIncome={monthlyIncome} />
+        <Tabs defaultValue="recurring">
+          <TabsList className="border border-white/10 bg-[#202133]">
+            <TabsTrigger
+              value="recurring"
+              className="text-slate-300 data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950"
+            >
+              {t("budget.tabs.recurring")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="payPeriod"
+              className="text-slate-300 data-[state=active]:bg-amber-500 data-[state=active]:text-slate-950"
+            >
+              {t("budget.tabs.payPeriod")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="recurring" className="mt-4">
+            <RecurringExpensesDashboard monthlyIncome={monthlyIncome} />
+          </TabsContent>
+          <TabsContent value="payPeriod" className="mt-4">
+            <CurrentPayPeriodDashboard />
+          </TabsContent>
+        </Tabs>
       </div>
     </main>
   );
