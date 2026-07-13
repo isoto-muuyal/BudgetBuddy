@@ -252,7 +252,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase()));
     return user || undefined;
   }
 
@@ -264,7 +264,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser & { verificationToken?: string; emailVerified?: boolean }): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(insertUser)
+      .values({ ...insertUser, email: insertUser.email.trim().toLowerCase() })
       .returning();
     return user;
   }

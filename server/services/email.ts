@@ -1,6 +1,13 @@
 import { MailerSend, EmailParams, Sender, Recipient } from "mailersend";
 import { config } from "../config";
 
+function getFrontendUrl() {
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
+  return process.env.NODE_ENV === "production"
+    ? "https://budgetwise.muuyal.tech"
+    : "http://localhost:5001";
+}
+
 export class EmailService {
   private mailerSend: MailerSend;
   private sender: Sender;
@@ -16,7 +23,7 @@ export class EmailService {
   async sendVerificationEmail(email: string, fullName: string, verificationToken: string) {
     const recipient = new Recipient(email, fullName);
     console.log("Sending verification email to:", email);
-    const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5001"}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${getFrontendUrl()}/verify-email?token=${verificationToken}`;
 
     const emailParams = new EmailParams()
       .setFrom(this.sender)
@@ -94,7 +101,7 @@ export class EmailService {
   async sendPasswordResetEmail(email: string, fullName: string, resetToken: string) {
     const recipient = new Recipient(email, fullName);
 
-    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5000"}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
 
     const emailParams = new EmailParams()
       .setFrom(this.sender)
