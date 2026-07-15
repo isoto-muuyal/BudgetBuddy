@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Chrome, HandCoins, Eye, EyeOff } from "lucide-react";
+import { Chrome, HandCoins, Eye, EyeOff, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -200,6 +200,20 @@ export default function Login() {
             <span className="text-slate-300">{t("login.noAccount")} </span>
             <Link href="/signup" className="font-medium text-amber-300 hover:text-amber-200" data-testid="link-signup">
               {t("login.signup")}
+            </Link>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-6 text-center">
+            <p className="mb-3 text-sm text-slate-400">{t("login.supportPrompt")}</p>
+            <Link href="/contact" data-testid="link-support">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-white/10 bg-transparent text-white hover:bg-white/10"
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                {t("login.supportButton")}
+              </Button>
             </Link>
           </div>
         </CardContent>

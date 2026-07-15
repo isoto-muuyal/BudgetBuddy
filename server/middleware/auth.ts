@@ -22,9 +22,13 @@ export const authenticateToken = async (
   try {
     const decoded = jwt.verify(token, config.jwt.secret) as any;
     const user = await storage.getUser(decoded.userId);
-    
+
     if (!user) {
       return res.status(401).json({ message: "User not found" });
+    }
+
+    if (user.frozen) {
+      return res.status(403).json({ message: "This account has been frozen. Please contact support." });
     }
 
     req.user = user;

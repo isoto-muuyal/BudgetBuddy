@@ -60,6 +60,38 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensureSiteVisitsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_visits (
+        id SERIAL PRIMARY KEY,
+        timestamp timestamp DEFAULT now() NOT NULL,
+        page text NOT NULL,
+        button text,
+        section text,
+        location text,
+        ip_address text,
+        user_identifier text
+      )
+    `);
+  };
+
+  const ensureLoginEventsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS login_events (
+        id SERIAL PRIMARY KEY,
+        user_id varchar NOT NULL REFERENCES users(id),
+        timestamp timestamp DEFAULT now() NOT NULL
+      )
+    `);
+  };
+
+  const ensureUsersFrozenColumn = async () => {
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS frozen boolean NOT NULL DEFAULT false
+    `);
+  };
+
   const ensureRecurringExpensesTable = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS recurring_expenses (
@@ -360,6 +392,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
   if (!shouldAutoPush) {
     await ensureAppVersionsTable();
     await ensureAdminTable();
+    await ensureSiteVisitsTable();
+    await ensureLoginEventsTable();
+    await ensureUsersFrozenColumn();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePageContentTable();
@@ -380,6 +415,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
     if (hasUsersTable && hasAppVersionsTable && hasAdminTable) {
       await ensureAppVersionsTable();
       await ensureAdminTable();
+      await ensureSiteVisitsTable();
+      await ensureLoginEventsTable();
+      await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
@@ -392,6 +430,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
     if (hasUsersTable) {
       await ensureAppVersionsTable();
       await ensureAdminTable();
+      await ensureSiteVisitsTable();
+      await ensureLoginEventsTable();
+      await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
@@ -420,6 +461,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
       if (!verifiedAdmins) {
         await ensureAdminTable();
       }
+      await ensureSiteVisitsTable();
+      await ensureLoginEventsTable();
+      await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePageContentTable();
@@ -493,6 +537,9 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
     await ensureAppVersionsTable();
     await ensureAdminTable();
+    await ensureSiteVisitsTable();
+    await ensureLoginEventsTable();
+    await ensureUsersFrozenColumn();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePageContentTable();

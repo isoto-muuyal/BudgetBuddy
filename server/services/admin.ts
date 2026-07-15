@@ -1,9 +1,8 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { promises as fs } from "fs";
-import path from "path";
 import { storage } from "../storage";
 import { config } from "../config";
+import type { SiteVisit } from "@shared/schema";
 
 export type VisitLogEntry = {
   timestamp: string;
@@ -16,56 +15,6 @@ export type VisitLogEntry = {
 };
 
 export class AdminService {
-  private csvPath = config.admin.visitsCsvPath;
-
-  private async ensureCsvFile(): Promise<void> {
-    const dir = path.dirname(this.csvPath);
-    await fs.mkdir(dir, { recursive: true });
-    try {
-      await fs.access(this.csvPath);
-    } catch {
-      await fs.writeFile(this.csvPath, "timestamp,page,button,section,location,ip_address,user_identifier\n", "utf8");
-    }
-  }
-
-  private escapeCsv(value: string): string {
-    const normalized = value.replace(/\r?\n/g, " ").trim();
-    return `"${normalized.replace(/"/g, '""')}"`;
-  }
-
-  private parseCsvLine(line: string): string[] {
-    const values: string[] = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i += 1) {
-      const char = line[i];
-      const nextChar = line[i + 1];
-
-      if (char === '"' && inQuotes && nextChar === '"') {
-        current += '"';
-        i += 1;
-        continue;
-      }
-
-      if (char === '"') {
-        inQuotes = !inQuotes;
-        continue;
-      }
-
-      if (char === "," && !inQuotes) {
-        values.push(current);
-        current = "";
-        continue;
-      }
-
-      current += char;
-    }
-
-    values.push(current);
-    return values;
-  }
-
   getClientIp(headers: Record<string, unknown>, fallbackIp?: string): string {
     const forwarded = typeof headers["x-forwarded-for"] === "string" ? headers["x-forwarded-for"] : "";
     const realIp = typeof headers["x-real-ip"] === "string" ? headers["x-real-ip"] : "";
@@ -114,29 +63,23 @@ export class AdminService {
   }
 
   async trackVisit(entry: VisitLogEntry): Promise<void> {
-    await this.ensureCsvFile();
-    const row = [
-      this.escapeCsv(entry.timestamp),
-      this.escapeCsv(entry.page),
-      this.escapeCsv(entry.button),
-      this.escapeCsv(entry.section),
-      this.escapeCsv(entry.location),
-      this.escapeCsv(entry.ipAddress),
-      this.escapeCsv(entry.userIdentifier),
-    ].join(",") + "\n";
-
-    await fs.appendFile(this.csvPath, row, "utf8");
+    await storage.trackVisit({
+      ...entry,
+      timestamp: new Date(entry.timestamp),
+    });
   }
 
   async getVisits(): Promise<VisitLogEntry[]> {
-    await this.ensureCsvFile();
-    const content = await fs.readFile(this.csvPath, "utf8");
-    const lines = content.split(/\r?\n/).filter(Boolean);
-
-    return lines.slice(1).map((line) => {
-      const [timestamp = "", page = "", button = "", section = "", location = "", ipAddress = "", userIdentifier = ""] = this.parseCsvLine(line);
-      return { timestamp, page, button, section, location, ipAddress, userIdentifier };
-    }).reverse();
+    const visits = await storage.getVisits();
+    return visits.map((visit: SiteVisit) => ({
+      timestamp: visit.timestamp.toISOString(),
+      page: visit.page,
+      button: visit.button ?? "",
+      section: visit.section ?? "",
+      location: visit.location ?? "",
+      ipAddress: visit.ipAddress ?? "",
+      userIdentifier: visit.userIdentifier ?? "",
+    }));
   }
 }
 

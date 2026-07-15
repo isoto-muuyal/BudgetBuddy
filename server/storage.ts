@@ -14,6 +14,8 @@ import {
   incomes,
   actualExpenseSets,
   smartAnalysisResults,
+  siteVisits,
+  loginEvents,
   type User,
   type InsertUser,
   type BudgetAnalysis,
@@ -32,9 +34,10 @@ import {
   type ExpenseItem,
   type ActualExpenseSet,
   type SmartAnalysisResult,
+  type SiteVisit,
 } from "@shared/schema";
 import { db } from "./db";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
@@ -73,6 +76,19 @@ export interface IStorage {
   verifyUserEmail(userId: string): Promise<void>;
   setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
   resetPassword(userId: string, newPassword: string): Promise<void>;
+  recordLogin(userId: string): Promise<void>;
+
+  // Admin user management methods
+  listUsersForAdmin(): Promise<{ id: string; email: string; frozen: boolean }[]>;
+  setUserFrozen(userId: string, frozen: boolean): Promise<void>;
+  deleteUserCascade(userId: string): Promise<void>;
+  getUserStats(): Promise<{
+    totalUsers: number;
+    verifiedUsers: number;
+    totalLogins: number;
+    loginsLast7Days: number;
+    loginsLast30Days: number;
+  }>;
 
   // Budget analysis methods
   getBudgetAnalysis(id: string): Promise<StoredBudgetAnalysis | undefined>;
@@ -123,6 +139,18 @@ export interface IStorage {
 
   // Admin methods
   getAdminByUsername(username: string): Promise<Admin | undefined>;
+
+  // Site visit methods
+  trackVisit(entry: {
+    timestamp: Date;
+    page: string;
+    button: string;
+    section: string;
+    location: string;
+    ipAddress: string;
+    userIdentifier: string;
+  }): Promise<void>;
+  getVisits(): Promise<SiteVisit[]>;
 
   // Page content methods
   getPageContent(slug: string): Promise<PageContent | undefined>;
@@ -306,6 +334,65 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ password: newPassword, passwordResetToken: null, passwordResetExpiry: null })
       .where(eq(users.id, userId));
+  }
+
+  async recordLogin(userId: string): Promise<void> {
+    await db.insert(loginEvents).values({ userId });
+  }
+
+  async listUsersForAdmin(): Promise<{ id: string; email: string; frozen: boolean }[]> {
+    return db
+      .select({ id: users.id, email: users.email, frozen: users.frozen })
+      .from(users)
+      .orderBy(desc(users.createdAt));
+  }
+
+  async setUserFrozen(userId: string, frozen: boolean): Promise<void> {
+    await db.update(users).set({ frozen }).where(eq(users.id, userId));
+  }
+
+  async deleteUserCascade(userId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(analysisEmbeddings).where(eq(analysisEmbeddings.userId, userId));
+      await tx.delete(globalAdviceSnapshots).where(eq(globalAdviceSnapshots.userId, userId));
+      await tx.delete(smartAnalysisResults).where(eq(smartAnalysisResults.userId, userId));
+      await tx.delete(payPeriodExpenses).where(eq(payPeriodExpenses.userId, userId));
+      await tx.delete(actualExpenseSets).where(eq(actualExpenseSets.userId, userId));
+      await tx.delete(recurringExpenses).where(eq(recurringExpenses.userId, userId));
+      await tx.delete(debts).where(eq(debts.userId, userId));
+      await tx.delete(budgetAnalyses).where(eq(budgetAnalyses.userId, userId));
+      await tx.delete(incomes).where(eq(incomes.userId, userId));
+      await tx.delete(loginEvents).where(eq(loginEvents.userId, userId));
+      await tx.delete(users).where(eq(users.id, userId));
+    });
+  }
+
+  async getUserStats(): Promise<{
+    totalUsers: number;
+    verifiedUsers: number;
+    totalLogins: number;
+    loginsLast7Days: number;
+    loginsLast30Days: number;
+  }> {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [[totalUsersRow], [verifiedUsersRow], [totalLoginsRow], [loginsLast7DaysRow], [loginsLast30DaysRow]] = await Promise.all([
+      db.select({ value: count() }).from(users),
+      db.select({ value: count() }).from(users).where(eq(users.emailVerified, true)),
+      db.select({ value: count() }).from(loginEvents),
+      db.select({ value: count() }).from(loginEvents).where(gte(loginEvents.timestamp, sevenDaysAgo)),
+      db.select({ value: count() }).from(loginEvents).where(gte(loginEvents.timestamp, thirtyDaysAgo)),
+    ]);
+
+    return {
+      totalUsers: totalUsersRow?.value ?? 0,
+      verifiedUsers: verifiedUsersRow?.value ?? 0,
+      totalLogins: totalLoginsRow?.value ?? 0,
+      loginsLast7Days: loginsLast7DaysRow?.value ?? 0,
+      loginsLast30Days: loginsLast30DaysRow?.value ?? 0,
+    };
   }
 
   async getBudgetAnalysis(id: string): Promise<StoredBudgetAnalysis | undefined> {
@@ -700,6 +787,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(admins.username, username));
 
     return admin || undefined;
+  }
+
+  async trackVisit(entry: {
+    timestamp: Date;
+    page: string;
+    button: string;
+    section: string;
+    location: string;
+    ipAddress: string;
+    userIdentifier: string;
+  }): Promise<void> {
+    await db.insert(siteVisits).values(entry);
+  }
+
+  async getVisits(): Promise<SiteVisit[]> {
+    return db.select().from(siteVisits).orderBy(desc(siteVisits.timestamp));
   }
 
   async getPageContent(slug: string): Promise<PageContent | undefined> {

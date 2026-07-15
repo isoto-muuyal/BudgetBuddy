@@ -169,6 +169,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+    try {
+      const users = await storage.listUsersForAdmin();
+      res.json(users);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/:id/freeze", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const frozen = req.body?.frozen !== false;
+      await storage.setUserFrozen(req.params.id, frozen);
+      res.json({ message: frozen ? "User frozen" : "User unfrozen" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      await storage.deleteUserCascade(req.params.id);
+      res.json({ message: "User deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/stats", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+    try {
+      const stats = await storage.getUserStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/signup", async (req, res) => {
     try {
@@ -728,7 +765,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const authResponse = authService.buildAuthResponse(user);
+      let authResponse;
+      try {
+        authResponse = await authService.completeLogin(user);
+      } catch (loginError: any) {
+        if (config.google.frontendRedirect) {
+          const redirectUrl = new URL(config.google.frontendRedirect);
+          redirectUrl.searchParams.set("error", loginError.message);
+          return res.redirect(redirectUrl.toString());
+        }
+        return res.status(403).json({ message: loginError.message });
+      }
+
       if (config.google.frontendRedirect) {
         const redirectUrl = new URL(config.google.frontendRedirect);
         redirectUrl.searchParams.set("token", authResponse.token);

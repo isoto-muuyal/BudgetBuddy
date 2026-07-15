@@ -48,7 +48,7 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
           COMPOSE_PATH: /home/${{ secrets.EC2_USER }}/apps/budgetbuddy/docker-compose.deploy.yml
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "mkdir -p $(dirname ${COMPOSE_PATH}) /home/${EC2_USER}/apps/budgetbuddy/data"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "mkdir -p $(dirname ${COMPOSE_PATH})"
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no docker-compose.deploy.yml ${EC2_USER}@${EC2_HOST}:${COMPOSE_PATH}
 
       - name: Deploy to EC2

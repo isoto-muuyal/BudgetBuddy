@@ -5,7 +5,7 @@ export const config = {
     fromName: process.env.FROM_NAME || "BudgetWise by Muuyal",
   },
   contact: {
-    recipientEmail: process.env.CONTACT_EMAIL || process.env.FROM_EMAIL || "noreply@muuyal.tech",
+    recipientEmail: process.env.CONTACT_EMAIL || "israel.soto@muuyal.tech",
   },
   ai: {
     service: process.env.AI_SERVICE || "huggingface", // "ollama" or "huggingface"
@@ -54,9 +54,6 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET || "your_jwt_secret_key",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-  },
-  admin: {
-    visitsCsvPath: process.env.ADMIN_VISITS_CSV_PATH || "./data/visits.csv",
   },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",

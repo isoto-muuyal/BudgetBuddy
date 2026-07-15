@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   passwordResetToken: text("password_reset_token"),
   passwordResetExpiry: timestamp("password_reset_expiry"),
+  frozen: boolean("frozen").notNull().default(false),
 });
 
 export const budgetAnalyses = pgTable("budget_analyses", {
@@ -129,6 +130,23 @@ export const admins = pgTable("ADMIN", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+});
+
+export const siteVisits = pgTable("site_visits", {
+  id: serial("id").primaryKey(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  page: text("page").notNull(),
+  button: text("button"),
+  section: text("section"),
+  location: text("location"),
+  ipAddress: text("ip_address"),
+  userIdentifier: text("user_identifier"),
+});
+
+export const loginEvents = pgTable("login_events", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
 export const pageContent = pgTable("page_content", {
@@ -361,5 +379,7 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;
 export type Admin = typeof admins.$inferSelect;
+export type SiteVisit = typeof siteVisits.$inferSelect;
+export type LoginEvent = typeof loginEvents.$inferSelect;
 export type PageContent = typeof pageContent.$inferSelect;
 export type PageContentUpdateInput = z.infer<typeof pageContentUpdateSchema>;

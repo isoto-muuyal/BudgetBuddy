@@ -48,6 +48,8 @@ const resources = {
         googleErrorTitle: "Google sign-in failed",
         googleSuccessTitle: "Success",
         googleSuccessDesc: "Logged in with Google",
+        supportPrompt: "Need help, have feedback, or a suggestion?",
+        supportButton: "Contact Support",
       },
       signup: {
         title: "Create Account",
@@ -504,6 +506,8 @@ const resources = {
         googleErrorTitle: "Error al iniciar con Google",
         googleSuccessTitle: "Éxito",
         googleSuccessDesc: "Sesión iniciada con Google",
+        supportPrompt: "¿Necesitas ayuda o tienes alguna sugerencia?",
+        supportButton: "Contactar soporte",
       },
       signup: {
         title: "Crear cuenta",
@@ -960,6 +964,8 @@ const resources = {
         googleErrorTitle: "Échec de connexion Google",
         googleSuccessTitle: "Succès",
         googleSuccessDesc: "Connecté avec Google",
+        supportPrompt: "Besoin d'aide ou une suggestion à partager ?",
+        supportButton: "Contacter le support",
       },
       signup: {
         title: "Créer un compte",
@@ -1416,6 +1422,8 @@ const resources = {
         googleErrorTitle: "Googleログインに失敗",
         googleSuccessTitle: "成功",
         googleSuccessDesc: "Googleでログインしました",
+        supportPrompt: "サポートが必要ですか?ご意見・ご提案もお寄せください。",
+        supportButton: "サポートに問い合わせる",
       },
       signup: {
         title: "アカウント作成",
@@ -1872,6 +1880,8 @@ const resources = {
         googleErrorTitle: "Ошибка входа Google",
         googleSuccessTitle: "Успех",
         googleSuccessDesc: "Вход через Google выполнен",
+        supportPrompt: "Нужна помощь или есть предложения?",
+        supportButton: "Связаться с поддержкой",
       },
       signup: {
         title: "Создать аккаунт",

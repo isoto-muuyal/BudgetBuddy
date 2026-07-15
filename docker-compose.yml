@@ -9,9 +9,6 @@ services:
     environment:
       - PORT=5003
       - DATABASE_URL=${DATABASE_URL}
-      - ADMIN_VISITS_CSV_PATH=/app/data/visits.csv
-    volumes:
-      - ./data:/app/data
     networks:
       - shared_network
 

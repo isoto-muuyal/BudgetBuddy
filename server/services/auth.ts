@@ -7,7 +7,7 @@ import { emailService } from "./email";
 import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
 export class AuthService {
-  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null }) {
+  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null; frozen?: boolean | null }) {
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwt.secret,
@@ -61,6 +61,15 @@ export class AuthService {
     };
   }
 
+  async completeLogin(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null; frozen?: boolean | null }) {
+    if (user.frozen) {
+      throw new Error("This account has been frozen. Please contact support.");
+    }
+
+    await storage.recordLogin(user.id);
+    return this.buildAuthResponse(user);
+  }
+
   async login(loginData: LoginUser) {
     const user = await storage.getUserByEmail(loginData.email);
     if (!user) {
@@ -72,7 +81,7 @@ export class AuthService {
       throw new Error("Invalid email or password");
     }
 
-    return this.buildAuthResponse(user);
+    return this.completeLogin(user);
   }
 
   async verifyEmail(token: string) {
