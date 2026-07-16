@@ -188,6 +188,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/users/:id/password-reset", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const result = await authService.sendPasswordResetByAdmin(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.message === "User not found" ? 404 : 500;
+      res.status(statusCode).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/admin/users/:id", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
     try {
       await storage.deleteUserCascade(req.params.id);

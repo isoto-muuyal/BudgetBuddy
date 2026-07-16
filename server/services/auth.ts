@@ -95,24 +95,38 @@ export class AuthService {
     return { message: "Email verified successfully" };
   }
 
-    async forgotPassword(data: ForgotPasswordInput) {
+  private async sendPasswordResetForUser(user: { id: string; email: string; fullName: string }) {
+    const resetToken = randomBytes(32).toString("hex");
+    const expiry = new Date(Date.now() + 3600000); // 1 hour
+
+    await storage.setPasswordResetToken(user.id, resetToken, expiry);
+    await emailService.sendPasswordResetEmail(user.email, user.fullName, resetToken);
+  }
+
+  async forgotPassword(data: ForgotPasswordInput) {
     const user = await storage.getUserByEmail(data.email);
     if (!user) {
       return { message: "If an account exists with this email, you will receive a password reset link." };
     }
 
-    const resetToken = randomBytes(32).toString("hex");
-    const expiry = new Date(Date.now() + 3600000); // 1 hour
-
-    await storage.setPasswordResetToken(user.id, resetToken, expiry);
-
     try {
-      await emailService.sendPasswordResetEmail(user.email, user.fullName, resetToken);
+      await this.sendPasswordResetForUser(user);
     } catch (error) {
       console.error("Failed to send password reset email:", error);
     }
 
     return { message: "If an account exists with this email, you will receive a password reset link." };
+  }
+
+  async sendPasswordResetByAdmin(userId: string) {
+    const user = await storage.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await this.sendPasswordResetForUser(user);
+
+    return { message: `Password reset link sent to ${user.email}` };
   }
 
   async resetPassword(data: ResetPasswordInput) {

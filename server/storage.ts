@@ -37,7 +37,7 @@ import {
   type SiteVisit,
 } from "@shared/schema";
 import { db } from "./db";
-import { and, count, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
@@ -353,9 +353,23 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUserCascade(userId: string): Promise<void> {
     await db.transaction(async (tx) => {
+      const userAnalyses = await tx
+        .select({ id: budgetAnalyses.id })
+        .from(budgetAnalyses)
+        .where(eq(budgetAnalyses.userId, userId));
+      const analysisIds = userAnalyses.map((analysis) => analysis.id);
+
       await tx.delete(analysisEmbeddings).where(eq(analysisEmbeddings.userId, userId));
       await tx.delete(globalAdviceSnapshots).where(eq(globalAdviceSnapshots.userId, userId));
       await tx.delete(smartAnalysisResults).where(eq(smartAnalysisResults.userId, userId));
+      if (analysisIds.length > 0) {
+        await tx.delete(analysisEmbeddings).where(inArray(analysisEmbeddings.analysisId, analysisIds));
+        await tx.delete(globalAdviceSnapshots).where(inArray(globalAdviceSnapshots.analysisId, analysisIds));
+        await tx.execute(sql`
+          DELETE FROM smart_analysis_results
+          WHERE legacy_analysis_id IN (${sql.join(analysisIds.map((id) => sql`${id}`), sql`, `)})
+        `);
+      }
       await tx.delete(payPeriodExpenses).where(eq(payPeriodExpenses.userId, userId));
       await tx.delete(actualExpenseSets).where(eq(actualExpenseSets.userId, userId));
       await tx.delete(recurringExpenses).where(eq(recurringExpenses.userId, userId));

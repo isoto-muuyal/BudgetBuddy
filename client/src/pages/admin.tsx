@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import { getAdminToken, removeAdminToken, setAdminToken } from "@/lib/queryClient";
 
 type VisitRow = {
@@ -74,6 +76,7 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAdminToken()));
   const adminToken = getAdminToken();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const handleAuthError = (error: any) => {
     if (error?.status === 401 || error?.status === 403) {
@@ -155,13 +158,45 @@ export default function AdminPage() {
     onError: handleAuthError,
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (id: string) =>
+      adminFetch(`/api/admin/users/${id}/password-reset`, {
+        method: "POST",
+      }),
+    onSuccess: (data: { message?: string }) => {
+      toast({
+        title: "Reset link sent",
+        description: data.message || "The password reset email was sent.",
+      });
+    },
+    onError: (error: any) => {
+      handleAuthError(error);
+      toast({
+        title: "Could not send reset link",
+        description: error?.message || "The password reset email could not be sent.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => adminFetch(`/api/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", adminToken] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats", adminToken] });
+      toast({
+        title: "User deleted",
+        description: "The user and related data were deleted.",
+      });
     },
-    onError: handleAuthError,
+    onError: (error: any) => {
+      handleAuthError(error);
+      toast({
+        title: "Could not delete user",
+        description: error?.message || "The user could not be deleted.",
+        variant: "destructive",
+      });
+    },
   });
 
   const rows = useMemo(() => visitsQuery.data ?? [], [visitsQuery.data]);
@@ -362,6 +397,15 @@ export default function AdminPage() {
                             onClick={() => freezeMutation.mutate({ id: user.id, frozen: !user.frozen })}
                           >
                             {user.frozen ? "Unfreeze" : "Freeze"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resetPasswordMutation.isPending}
+                            onClick={() => resetPasswordMutation.mutate(user.id)}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            Reset Link
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
