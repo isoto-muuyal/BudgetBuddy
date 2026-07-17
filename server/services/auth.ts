@@ -6,6 +6,8 @@ import { storage } from "../storage";
 import { emailService } from "./email";
 import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
+const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000;
+
 export class AuthService {
   buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null; frozen?: boolean | null }) {
     const token = jwt.sign(
@@ -97,7 +99,7 @@ export class AuthService {
 
   private async sendPasswordResetForUser(user: { id: string; email: string; fullName: string }) {
     const resetToken = randomBytes(32).toString("hex");
-    const expiry = new Date(Date.now() + 3600000); // 1 hour
+    const expiry = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
 
     await storage.setPasswordResetToken(user.id, resetToken, expiry);
     await emailService.sendPasswordResetEmail(user.email, user.fullName, resetToken);

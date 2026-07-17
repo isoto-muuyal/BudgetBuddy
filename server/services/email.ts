@@ -62,7 +62,7 @@ export class EmailService {
             </p>
             
             <p style="color: #6b7280; line-height: 1.6; font-size: 14px;">
-              This verification link will expire in 24 hours. If you didn't sign up for BudgetWise, you can safely ignore this email.
+              This verification link can only be used once. If you didn't sign up for BudgetWise, you can safely ignore this email.
             </p>
           </div>
           
@@ -82,7 +82,7 @@ export class EmailService {
         
         ${verificationUrl}
         
-        This verification link will expire in 24 hours. If you didn't sign up for BudgetWise, you can safely ignore this email.
+        This verification link can only be used once. If you didn't sign up for BudgetWise, you can safely ignore this email.
         
         Best regards,
         The BudgetWise Team
@@ -140,7 +140,7 @@ export class EmailService {
             </p>
             
             <p style="color: #6b7280; line-height: 1.6; font-size: 14px;">
-              This password reset link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+              This password reset link will expire in 20 minutes and can only be used once. If you didn't request a password reset, you can safely ignore this email.
             </p>
           </div>
           
@@ -160,7 +160,7 @@ export class EmailService {
         
         ${resetUrl}
         
-        This password reset link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+        This password reset link will expire in 20 minutes and can only be used once. If you didn't request a password reset, you can safely ignore this email.
         
         Best regards,
         The BudgetWise Team

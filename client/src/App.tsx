@@ -22,6 +22,7 @@ import LoadingOverlay from "@/components/loading-overlay";
 import NotFound from "@/pages/not-found";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import VerifyEmail from "@/pages/verify-email";
 import History from "@/pages/history";
 import AdminPage from "@/pages/admin";
 import VisitTracker from "@/components/visit-tracker";
@@ -53,6 +54,7 @@ function Router() {
         <Route path="/debt" component={Debt} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/history" component={History} />
         <Route path="/about" component={About} />
         <Route path="/how-it-works" component={HowItWorks} />

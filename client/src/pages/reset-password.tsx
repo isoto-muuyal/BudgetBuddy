@@ -21,12 +21,6 @@ export default function ResetPassword() {
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const resetToken = params.get("token");
-    setToken(resetToken);
-  }, []);
-
   const form = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -34,6 +28,13 @@ export default function ResetPassword() {
       newPassword: "",
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get("token");
+    setToken(resetToken);
+    form.setValue("token", resetToken || "");
+  }, [form]);
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: ResetPasswordInput) => {
