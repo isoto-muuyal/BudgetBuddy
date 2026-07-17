@@ -120,6 +120,38 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensurePayPeriodExpensesTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pay_period_expenses (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        name text NOT NULL,
+        amount numeric(10,2) NOT NULL,
+        category text NOT NULL DEFAULT 'wants',
+        paid boolean NOT NULL DEFAULT false,
+        source_recurring_expense_id varchar REFERENCES recurring_expenses(id),
+        archived_at timestamp,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'wants'
+    `);
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ADD COLUMN IF NOT EXISTS paid boolean NOT NULL DEFAULT false
+    `);
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ADD COLUMN IF NOT EXISTS source_recurring_expense_id varchar REFERENCES recurring_expenses(id)
+    `);
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ADD COLUMN IF NOT EXISTS archived_at timestamp
+    `);
+  };
+
   const ensurePageContentTable = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS page_content (
@@ -397,6 +429,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureUsersFrozenColumn();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
+    await ensurePayPeriodExpensesTable();
     await ensurePageContentTable();
     await ensureIncomesTable();
     await ensureActualExpenseSetsTable();
@@ -420,6 +453,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePayPeriodExpensesTable();
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
@@ -435,6 +469,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePayPeriodExpensesTable();
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
@@ -466,6 +501,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureUsersFrozenColumn();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
+      await ensurePayPeriodExpensesTable();
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
@@ -542,6 +578,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureUsersFrozenColumn();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
+    await ensurePayPeriodExpensesTable();
     await ensurePageContentTable();
     await ensureIncomesTable();
     await ensureActualExpenseSetsTable();
