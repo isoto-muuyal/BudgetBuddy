@@ -37,7 +37,7 @@ import {
   type SiteVisit,
 } from "@shared/schema";
 import { db } from "./db";
-import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
@@ -65,6 +65,15 @@ export interface GlobalAdviceSnapshotRecord {
   createdAt: Date | null;
 }
 
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  frozen: boolean;
+  createdAt: Date | null;
+  lastLoginAt: Date | null;
+  passwordResetRequestedAt: Date | null;
+}
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -76,10 +85,13 @@ export interface IStorage {
   verifyUserEmail(userId: string): Promise<void>;
   setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void>;
   resetPassword(userId: string, newPassword: string): Promise<void>;
+  setTemporaryPassword(userId: string, temporaryPasswordHash: string): Promise<void>;
+  consumeTemporaryPassword(userId: string): Promise<void>;
+  completeForcedPasswordChange(userId: string, newPassword: string): Promise<void>;
   recordLogin(userId: string): Promise<void>;
 
   // Admin user management methods
-  listUsersForAdmin(): Promise<{ id: string; email: string; frozen: boolean }[]>;
+  listUsersForAdmin(): Promise<AdminUserRecord[]>;
   setUserFrozen(userId: string, frozen: boolean): Promise<void>;
   deleteUserCascade(userId: string): Promise<void>;
   getUserStats(): Promise<{
@@ -119,19 +131,19 @@ export interface IStorage {
   deleteDebt(userId: string, debtId: string): Promise<void>;
 
   // Recurring expense methods
-  getRecurringExpensesByUser(userId: string): Promise<RecurringExpense[]>;
+  getRecurringExpensesByUser(userId: string, month: string): Promise<RecurringExpense[]>;
   createRecurringExpense(userId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
   updateRecurringExpense(userId: string, expenseId: string, expense: InsertRecurringExpense): Promise<RecurringExpense>;
   toggleRecurringExpense(userId: string, expenseId: string, enabled: boolean): Promise<RecurringExpense>;
   deleteRecurringExpense(userId: string, expenseId: string): Promise<void>;
+  copyRecurringExpensesToMonth(userId: string, fromMonth: string, toMonth: string): Promise<RecurringExpense[]>;
 
   // Pay period expense methods
-  getActivePayPeriodExpensesByUser(userId: string): Promise<PayPeriodExpense[]>;
+  getPayPeriodExpensesByUserAndMonth(userId: string, month: string): Promise<PayPeriodExpense[]>;
   createPayPeriodExpense(userId: string, expense: InsertPayPeriodExpense): Promise<PayPeriodExpense>;
   updatePayPeriodExpense(userId: string, expenseId: string, expense: InsertPayPeriodExpense): Promise<PayPeriodExpense>;
   togglePayPeriodExpense(userId: string, expenseId: string, paid: boolean): Promise<PayPeriodExpense>;
   deletePayPeriodExpense(userId: string, expenseId: string): Promise<void>;
-  archiveAllPayPeriodExpenses(userId: string): Promise<void>;
 
   // App version methods
   getLatestAppVersion(): Promise<AppVersion>;
@@ -325,14 +337,55 @@ export class DatabaseStorage implements IStorage {
   async setPasswordResetToken(userId: string, token: string, expiry: Date): Promise<void> {
     await db
       .update(users)
-      .set({ passwordResetToken: token, passwordResetExpiry: expiry })
+      .set({ passwordResetToken: token, passwordResetExpiry: expiry, passwordResetRequestedAt: new Date() })
       .where(eq(users.id, userId));
   }
 
   async resetPassword(userId: string, newPassword: string): Promise<void> {
     await db
       .update(users)
-      .set({ password: newPassword, passwordResetToken: null, passwordResetExpiry: null })
+      .set({
+        password: newPassword,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+        temporaryPasswordHash: null,
+        forcePasswordChange: false,
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async setTemporaryPassword(userId: string, temporaryPasswordHash: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        temporaryPasswordHash,
+        temporaryPasswordUsedAt: null,
+        forcePasswordChange: true,
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async consumeTemporaryPassword(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        temporaryPasswordHash: null,
+        temporaryPasswordUsedAt: new Date(),
+        forcePasswordChange: true,
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async completeForcedPasswordChange(userId: string, newPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        password: newPassword,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+        temporaryPasswordHash: null,
+        forcePasswordChange: false,
+      })
       .where(eq(users.id, userId));
   }
 
@@ -340,10 +393,19 @@ export class DatabaseStorage implements IStorage {
     await db.insert(loginEvents).values({ userId });
   }
 
-  async listUsersForAdmin(): Promise<{ id: string; email: string; frozen: boolean }[]> {
+  async listUsersForAdmin(): Promise<AdminUserRecord[]> {
     return db
-      .select({ id: users.id, email: users.email, frozen: users.frozen })
+      .select({
+        id: users.id,
+        email: users.email,
+        frozen: users.frozen,
+        createdAt: users.createdAt,
+        lastLoginAt: sql<Date | null>`max(${loginEvents.timestamp})`,
+        passwordResetRequestedAt: users.passwordResetRequestedAt,
+      })
       .from(users)
+      .leftJoin(loginEvents, eq(loginEvents.userId, users.id))
+      .groupBy(users.id, users.email, users.frozen, users.createdAt, users.passwordResetRequestedAt)
       .orderBy(desc(users.createdAt));
   }
 
@@ -623,8 +685,11 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(debts.id, debtId), eq(debts.userId, userId)));
   }
 
-  async getRecurringExpensesByUser(userId: string): Promise<RecurringExpense[]> {
-    return await db.select().from(recurringExpenses).where(eq(recurringExpenses.userId, userId));
+  async getRecurringExpensesByUser(userId: string, month: string): Promise<RecurringExpense[]> {
+    return await db
+      .select()
+      .from(recurringExpenses)
+      .where(and(eq(recurringExpenses.userId, userId), eq(recurringExpenses.month, month)));
   }
 
   async createRecurringExpense(userId: string, expenseInput: InsertRecurringExpense): Promise<RecurringExpense> {
@@ -677,11 +742,34 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(recurringExpenses.id, expenseId), eq(recurringExpenses.userId, userId)));
   }
 
-  async getActivePayPeriodExpensesByUser(userId: string): Promise<PayPeriodExpense[]> {
+  async copyRecurringExpensesToMonth(userId: string, fromMonth: string, toMonth: string): Promise<RecurringExpense[]> {
+    const sourceExpenses = await this.getRecurringExpensesByUser(userId, fromMonth);
+    if (sourceExpenses.length === 0) {
+      return [];
+    }
+
+    return await db
+      .insert(recurringExpenses)
+      .values(
+        sourceExpenses.map((expense) => ({
+          userId,
+          name: expense.name,
+          amount: expense.amount,
+          frequency: expense.frequency,
+          category: expense.category,
+          type: expense.type,
+          enabled: expense.enabled,
+          month: toMonth,
+        }))
+      )
+      .returning();
+  }
+
+  async getPayPeriodExpensesByUserAndMonth(userId: string, month: string): Promise<PayPeriodExpense[]> {
     return await db
       .select()
       .from(payPeriodExpenses)
-      .where(and(eq(payPeriodExpenses.userId, userId), isNull(payPeriodExpenses.archivedAt)));
+      .where(and(eq(payPeriodExpenses.userId, userId), eq(payPeriodExpenses.month, month)));
   }
 
   async createPayPeriodExpense(userId: string, expenseInput: InsertPayPeriodExpense): Promise<PayPeriodExpense> {
@@ -732,13 +820,6 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(payPeriodExpenses)
       .where(and(eq(payPeriodExpenses.id, expenseId), eq(payPeriodExpenses.userId, userId)));
-  }
-
-  async archiveAllPayPeriodExpenses(userId: string): Promise<void> {
-    await db
-      .update(payPeriodExpenses)
-      .set({ archivedAt: new Date() })
-      .where(and(eq(payPeriodExpenses.userId, userId), isNull(payPeriodExpenses.archivedAt)));
   }
 
   private getNextPatchVersion(version: string): string {

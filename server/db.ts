@@ -85,10 +85,26 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
-  const ensureUsersFrozenColumn = async () => {
+  const ensureUserAuthColumns = async () => {
     await pool.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS frozen boolean NOT NULL DEFAULT false
+    `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS password_reset_requested_at timestamp
+    `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS temporary_password_hash text
+    `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS temporary_password_used_at timestamp
+    `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS force_password_change boolean NOT NULL DEFAULT false
     `);
   };
 
@@ -103,6 +119,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         category text NOT NULL DEFAULT 'wants',
         type text NOT NULL DEFAULT 'housing',
         enabled boolean NOT NULL DEFAULT true,
+        month text NOT NULL DEFAULT to_char(now(), 'YYYY-MM'),
         created_at timestamp DEFAULT now()
       )
     `);
@@ -118,6 +135,11 @@ export async function ensureDatabaseSchema(): Promise<void> {
       ALTER TABLE recurring_expenses
       ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true
     `);
+    // Existing rows had no month concept; the current month is the only reasonable backfill.
+    await pool.query(`
+      ALTER TABLE recurring_expenses
+      ADD COLUMN IF NOT EXISTS month text NOT NULL DEFAULT to_char(now(), 'YYYY-MM')
+    `);
   };
 
   const ensurePayPeriodExpensesTable = async () => {
@@ -131,6 +153,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         paid boolean NOT NULL DEFAULT false,
         source_recurring_expense_id varchar REFERENCES recurring_expenses(id),
         archived_at timestamp,
+        month text NOT NULL DEFAULT to_char(now(), 'YYYY-MM'),
         created_at timestamp DEFAULT now()
       )
     `);
@@ -149,6 +172,21 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await pool.query(`
       ALTER TABLE pay_period_expenses
       ADD COLUMN IF NOT EXISTS archived_at timestamp
+    `);
+    // month can't be backfilled from other columns via a single ADD COLUMN
+    // DEFAULT, so expand (nullable) -> backfill from archived_at/created_at -> constrain.
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ADD COLUMN IF NOT EXISTS month text
+    `);
+    await pool.query(`
+      UPDATE pay_period_expenses
+      SET month = to_char(COALESCE(archived_at, created_at, now()), 'YYYY-MM')
+      WHERE month IS NULL
+    `);
+    await pool.query(`
+      ALTER TABLE pay_period_expenses
+      ALTER COLUMN month SET NOT NULL
     `);
   };
 
@@ -426,7 +464,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAdminTable();
     await ensureSiteVisitsTable();
     await ensureLoginEventsTable();
-    await ensureUsersFrozenColumn();
+    await ensureUserAuthColumns();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePayPeriodExpensesTable();
@@ -450,7 +488,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAdminTable();
       await ensureSiteVisitsTable();
       await ensureLoginEventsTable();
-      await ensureUsersFrozenColumn();
+      await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePayPeriodExpensesTable();
@@ -466,7 +504,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAdminTable();
       await ensureSiteVisitsTable();
       await ensureLoginEventsTable();
-      await ensureUsersFrozenColumn();
+      await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePayPeriodExpensesTable();
@@ -498,7 +536,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       }
       await ensureSiteVisitsTable();
       await ensureLoginEventsTable();
-      await ensureUsersFrozenColumn();
+      await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
       await ensureRecurringExpensesTable();
       await ensurePayPeriodExpensesTable();
@@ -523,7 +561,12 @@ export async function ensureDatabaseSchema(): Promise<void> {
         verification_token text,
         created_at timestamp DEFAULT now(),
         password_reset_token text,
-        password_reset_expiry timestamp
+        password_reset_expiry timestamp,
+        password_reset_requested_at timestamp,
+        temporary_password_hash text,
+        temporary_password_used_at timestamp,
+        force_password_change boolean NOT NULL DEFAULT false,
+        frozen boolean NOT NULL DEFAULT false
       )
     `);
     await pool.query(`
@@ -575,7 +618,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAdminTable();
     await ensureSiteVisitsTable();
     await ensureLoginEventsTable();
-    await ensureUsersFrozenColumn();
+    await ensureUserAuthColumns();
     await ensureAnalysisIntelligenceTables();
     await ensureRecurringExpensesTable();
     await ensurePayPeriodExpensesTable();

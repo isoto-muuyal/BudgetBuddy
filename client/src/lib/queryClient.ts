@@ -26,6 +26,8 @@ export const setAdminToken = (token: string): void => {
 
 export const removeAuthToken = (): void => {
   localStorage.removeItem('auth_token');
+  localStorage.removeItem("force_password_change");
+  window.dispatchEvent(new Event("force-password-change-changed"));
 };
 
 export const removeAdminToken = (): void => {

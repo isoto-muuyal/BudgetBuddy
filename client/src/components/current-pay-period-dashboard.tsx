@@ -9,24 +9,13 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { GripVertical, Plus, RefreshCw, Save, Trash2, Wallet } from "lucide-react";
+import { GripVertical, Plus, Save, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseMoney } from "@/lib/debt-plan";
@@ -51,6 +40,10 @@ interface RecurringPoolItem {
   enabled: boolean;
 }
 
+interface CurrentPayPeriodDashboardProps {
+  selectedMonth: string;
+}
+
 const DROP_ZONE_ID = "pay-period-drop-zone";
 
 const DEFAULT_FORM = {
@@ -63,7 +56,7 @@ function formatCurrency(value: number): string {
   return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function CurrentPayPeriodDashboard() {
+export default function CurrentPayPeriodDashboard({ selectedMonth }: CurrentPayPeriodDashboardProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [expenseForm, setExpenseForm] = useState({ ...DEFAULT_FORM });
@@ -72,23 +65,26 @@ export default function CurrentPayPeriodDashboard() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  const payPeriodQueryKey = [`/api/pay-period-expenses?month=${selectedMonth}`];
+  const recurringQueryKey = [`/api/recurring-expenses?month=${selectedMonth}`];
+
   const { data: payPeriodExpenses = [], isLoading } = useQuery<PayPeriodExpenseRow[]>({
-    queryKey: ["/api/pay-period-expenses"],
+    queryKey: payPeriodQueryKey,
   });
 
   const { data: recurringPool = [] } = useQuery<RecurringPoolItem[]>({
-    queryKey: ["/api/recurring-expenses"],
+    queryKey: recurringQueryKey,
   });
 
   const enabledPool = useMemo(() => recurringPool.filter((item) => item.enabled), [recurringPool]);
 
   const addMutation = useMutation({
     mutationFn: async (payload: { name: string; amount: string; category: RecurringExpenseCategory; sourceRecurringExpenseId?: string | null }) => {
-      const response = await apiRequest("POST", "/api/pay-period-expenses", payload);
+      const response = await apiRequest("POST", "/api/pay-period-expenses", { ...payload, month: selectedMonth });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pay-period-expenses"] });
+      queryClient.invalidateQueries({ queryKey: payPeriodQueryKey });
       setExpenseForm({ ...DEFAULT_FORM });
       toast({ title: t("payPeriod.addedTitle"), description: t("payPeriod.addedDesc") });
     },
@@ -114,11 +110,12 @@ export default function CurrentPayPeriodDashboard() {
         amount: payload.amount,
         category: payload.category,
         sourceRecurringExpenseId: payload.sourceRecurringExpenseId,
+        month: selectedMonth,
       });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pay-period-expenses"] });
+      queryClient.invalidateQueries({ queryKey: payPeriodQueryKey });
       setEditingExpenseId(null);
       toast({ title: t("payPeriod.updatedTitle"), description: t("payPeriod.updatedDesc") });
     },
@@ -139,9 +136,9 @@ export default function CurrentPayPeriodDashboard() {
       return response.json();
     },
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/pay-period-expenses"] });
-      const previous = queryClient.getQueryData<PayPeriodExpenseRow[]>(["/api/pay-period-expenses"]);
-      queryClient.setQueryData<PayPeriodExpenseRow[]>(["/api/pay-period-expenses"], (current) =>
+      await queryClient.cancelQueries({ queryKey: payPeriodQueryKey });
+      const previous = queryClient.getQueryData<PayPeriodExpenseRow[]>(payPeriodQueryKey);
+      queryClient.setQueryData<PayPeriodExpenseRow[]>(payPeriodQueryKey, (current) =>
         (current ?? []).map((expense) =>
           expense.id === payload.expenseId ? { ...expense, paid: payload.paid } : expense
         )
@@ -150,7 +147,7 @@ export default function CurrentPayPeriodDashboard() {
     },
     onError: (error: any, _payload, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(["/api/pay-period-expenses"], context.previous);
+        queryClient.setQueryData(payPeriodQueryKey, context.previous);
       }
       toast({
         title: t("payPeriod.updateErrorTitle"),
@@ -159,7 +156,7 @@ export default function CurrentPayPeriodDashboard() {
       });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pay-period-expenses"] });
+      queryClient.invalidateQueries({ queryKey: payPeriodQueryKey });
     },
   });
 
@@ -167,17 +164,7 @@ export default function CurrentPayPeriodDashboard() {
     mutationFn: async (expenseId: string) => {
       await apiRequest("DELETE", `/api/pay-period-expenses/${expenseId}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/pay-period-expenses"] }),
-  });
-
-  const resetMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/pay-period-expenses/reset");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pay-period-expenses"] });
-      toast({ title: t("payPeriod.resetSuccessTitle"), description: t("payPeriod.resetSuccessDesc") });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: payPeriodQueryKey }),
   });
 
   const totalExpenses = useMemo(
@@ -240,33 +227,6 @@ export default function CurrentPayPeriodDashboard() {
           <Card className="border-white/10 bg-[#202133] text-white shadow-xl">
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base">{t("payPeriod.listTitle")}</CardTitle>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="border-white/10 bg-transparent text-white hover:bg-white/10">
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {t("payPeriod.startNewPeriod")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-white/10 bg-[#202133] text-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("payPeriod.confirmResetTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-400">
-                      {t("payPeriod.confirmReset")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="border-white/10 bg-transparent text-white hover:bg-white/10">
-                      {t("payPeriod.confirmResetCancel")}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-amber-500 text-slate-950 hover:bg-amber-400"
-                      onClick={() => resetMutation.mutate()}
-                    >
-                      {t("payPeriod.confirmResetAction")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-[1.2fr_0.9fr_0.9fr_auto]">

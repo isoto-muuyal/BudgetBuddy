@@ -14,6 +14,9 @@ import { apiRequest, setAuthToken } from "@/lib/queryClient";
 import { loginSchema, type LoginUser } from "@shared/schema";
 import { useTranslation } from "react-i18next";
 
+const FORCE_PASSWORD_CHANGE_KEY = "force_password_change";
+const FORCE_PASSWORD_CHANGE_EVENT = "force-password-change-changed";
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +37,8 @@ export default function Login() {
     }
     if (token) {
       setAuthToken(token);
+      localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
+      window.dispatchEvent(new Event(FORCE_PASSWORD_CHANGE_EVENT));
       params.delete("token");
       const cleanUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
       window.history.replaceState({}, "", cleanUrl);
@@ -64,6 +69,12 @@ export default function Login() {
       if (data.token) {
         setAuthToken(data.token);
       }
+      if (data.user?.forcePasswordChange) {
+        localStorage.setItem(FORCE_PASSWORD_CHANGE_KEY, "true");
+      } else {
+        localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
+      }
+      window.dispatchEvent(new Event(FORCE_PASSWORD_CHANGE_EVENT));
       toast({
         title: t("login.googleSuccessTitle"),
         description: t("login.googleSuccessDesc"),

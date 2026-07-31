@@ -18,6 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getAdminToken, removeAdminToken, setAdminToken } from "@/lib/queryClient";
 
@@ -40,6 +47,9 @@ type AdminUserRow = {
   id: string;
   email: string;
   frozen: boolean;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  passwordResetRequestedAt: string | null;
 };
 
 type UserStats = {
@@ -74,9 +84,15 @@ async function adminFetch(path: string, options: RequestInit = {}) {
 export default function AdminPage() {
   const [credentials, setCredentials] = useState({ username: "", password: "" });
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAdminToken()));
+  const [generatedTemporaryPassword, setGeneratedTemporaryPassword] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
   const adminToken = getAdminToken();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const formatTimestamp = (value: string | null) => value ? new Date(value).toLocaleString() : "-";
 
   const handleAuthError = (error: any) => {
     if (error?.status === 401 || error?.status === 403) {
@@ -179,6 +195,30 @@ export default function AdminPage() {
     },
   });
 
+  const temporaryPasswordMutation = useMutation({
+    mutationFn: async (user: AdminUserRow) => {
+      const data = await adminFetch(`/api/admin/users/${user.id}/temporary-password`, {
+        method: "POST",
+      });
+      return { email: user.email, temporaryPassword: data.temporaryPassword as string };
+    },
+    onSuccess: (data) => {
+      setGeneratedTemporaryPassword({ email: data.email, password: data.temporaryPassword });
+      toast({
+        title: "Temporary password generated",
+        description: "Copy it now. It will not be shown again.",
+      });
+    },
+    onError: (error: any) => {
+      handleAuthError(error);
+      toast({
+        title: "Could not generate temporary password",
+        description: error?.message || "The temporary password could not be generated.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => adminFetch(`/api/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -254,6 +294,31 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 pt-8">
+      <Dialog open={Boolean(generatedTemporaryPassword)} onOpenChange={(open) => !open && setGeneratedTemporaryPassword(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Temporary Password</DialogTitle>
+            <DialogDescription>
+              Share this with {generatedTemporaryPassword?.email}. It can be used to sign in once and then the user must set a new password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted px-3 py-2 font-mono text-sm break-all">
+              {generatedTemporaryPassword?.password}
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (generatedTemporaryPassword?.password) {
+                  navigator.clipboard?.writeText(generatedTemporaryPassword.password);
+                }
+              }}
+            >
+              Copy Password
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="flex items-center justify-end mb-4">
         <Button
           variant="outline"
@@ -375,6 +440,9 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead>Email</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>Last Reset Request</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -389,6 +457,9 @@ export default function AdminPage() {
                             <Badge variant="secondary">Active</Badge>
                           )}
                         </TableCell>
+                        <TableCell>{formatTimestamp(user.createdAt)}</TableCell>
+                        <TableCell>{formatTimestamp(user.lastLoginAt)}</TableCell>
+                        <TableCell>{formatTimestamp(user.passwordResetRequestedAt)}</TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button
                             variant="outline"
@@ -406,6 +477,14 @@ export default function AdminPage() {
                           >
                             <Mail className="mr-2 h-4 w-4" />
                             Reset Link
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={temporaryPasswordMutation.isPending}
+                            onClick={() => temporaryPasswordMutation.mutate(user)}
+                          >
+                            Temp Password
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -433,7 +512,7 @@ export default function AdminPage() {
                     ))}
                     {users.length === 0 && !usersQuery.isLoading && (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-gray-500">
+                        <TableCell colSpan={6} className="text-center text-gray-500">
                           No users yet.
                         </TableCell>
                       </TableRow>

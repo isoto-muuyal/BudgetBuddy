@@ -31,6 +31,14 @@ export const authenticateToken = async (
       return res.status(403).json({ message: "This account has been frozen. Please contact support." });
     }
 
+    const allowedDuringForcedPasswordChange = new Set([
+      "/api/user/profile",
+      "/api/auth/complete-password-change",
+    ]);
+    if (user.forcePasswordChange && !allowedDuringForcedPasswordChange.has(req.path)) {
+      return res.status(403).json({ message: "Password change required before continuing." });
+    }
+
     req.user = user;
     next();
   } catch (error) {

@@ -37,11 +37,13 @@ echo -e "${YELLOW}Building and restarting containers...${NC}"
 # -d runs it in the background
 docker compose up -d --build
 
-# 5. runs the migration inside container
-echo -e "${YELLOW}Running database migrations...${NC}"
-docker exec budgetbuddy_app npm run db:push
+# 5. Schema changes are applied automatically on container boot via
+# ensureDatabaseSchema() (server/db.ts) - additive only (CREATE TABLE IF NOT
+# EXISTS / ADD COLUMN IF NOT EXISTS), never destructive. Do NOT run
+# `drizzle-kit push` here: it diffs shared/schema.ts against the live
+# database non-interactively and can drop columns/tables that hold real data.
 
-# 6. Cleanup 
+# 6. Cleanup
 echo -e "${YELLOW}Cleaning up old images...${NC}"
 docker image prune -f
 

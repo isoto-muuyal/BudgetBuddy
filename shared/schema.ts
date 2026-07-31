@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   passwordResetToken: text("password_reset_token"),
   passwordResetExpiry: timestamp("password_reset_expiry"),
+  passwordResetRequestedAt: timestamp("password_reset_requested_at"),
+  temporaryPasswordHash: text("temporary_password_hash"),
+  temporaryPasswordUsedAt: timestamp("temporary_password_used_at"),
+  forcePasswordChange: boolean("force_password_change").notNull().default(false),
   frozen: boolean("frozen").notNull().default(false),
 });
 
@@ -105,6 +109,7 @@ export const recurringExpenses = pgTable("recurring_expenses", {
   category: text("category").notNull().default("wants"),
   type: text("type").notNull().default("housing"),
   enabled: boolean("enabled").notNull().default(true),
+  month: text("month").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -117,6 +122,7 @@ export const payPeriodExpenses = pgTable("pay_period_expenses", {
   paid: boolean("paid").notNull().default(false),
   sourceRecurringExpenseId: varchar("source_recurring_expense_id").references(() => recurringExpenses.id),
   archivedAt: timestamp("archived_at"),
+  month: text("month").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -200,6 +206,10 @@ export const debtUpdateSchema = z.object({
   interestRate: z.string().min(1, "Interest rate is required"),
 });
 
+export const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export const monthKeySchema = z.string().regex(MONTH_KEY_REGEX, "Invalid month, expected YYYY-MM");
+
 export const insertRecurringExpenseSchema = createInsertSchema(recurringExpenses).omit({
   id: true,
   createdAt: true,
@@ -212,12 +222,18 @@ export const recurringExpenseInputSchema = z.object({
   frequency: z.enum(RECURRING_EXPENSE_FREQUENCIES),
   category: z.enum(RECURRING_EXPENSE_CATEGORIES),
   type: z.enum(RECURRING_EXPENSE_TYPES),
+  month: monthKeySchema,
 });
 
 export const recurringExpenseUpdateSchema = recurringExpenseInputSchema;
 
 export const recurringExpenseToggleSchema = z.object({
   enabled: z.boolean(),
+});
+
+export const recurringExpenseImportSchema = z.object({
+  fromMonth: monthKeySchema,
+  toMonth: monthKeySchema,
 });
 
 export const insertPayPeriodExpenseSchema = createInsertSchema(payPeriodExpenses).omit({
@@ -232,6 +248,7 @@ export const payPeriodExpenseInputSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
   category: z.enum(RECURRING_EXPENSE_CATEGORIES),
   sourceRecurringExpenseId: z.string().optional().nullable(),
+  month: monthKeySchema,
 });
 
 export const payPeriodExpenseUpdateSchema = payPeriodExpenseInputSchema;
@@ -370,6 +387,7 @@ export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type InsertRecurringExpense = z.infer<typeof insertRecurringExpenseSchema>;
 export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
 export type RecurringExpenseToggleInput = z.infer<typeof recurringExpenseToggleSchema>;
+export type RecurringExpenseImportInput = z.infer<typeof recurringExpenseImportSchema>;
 export type PayPeriodExpense = typeof payPeriodExpenses.$inferSelect;
 export type InsertPayPeriodExpense = z.infer<typeof insertPayPeriodExpenseSchema>;
 export type PayPeriodExpenseInput = z.infer<typeof payPeriodExpenseInputSchema>;

@@ -1,12 +1,70 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HandCoins } from "lucide-react";
+import { addMonths, format, parse, subMonths } from "date-fns";
+import { ChevronLeft, ChevronRight, HandCoins } from "lucide-react";
 import RecurringExpensesDashboard from "@/components/recurring-expenses-dashboard";
 import CurrentPayPeriodDashboard from "@/components/current-pay-period-dashboard";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "react-i18next";
 
+const MONTH_KEY_FORMAT = "yyyy-MM";
+
+function getCurrentMonthKey(): string {
+  return format(new Date(), MONTH_KEY_FORMAT);
+}
+
+function MonthSwitcher({
+  selectedMonth,
+  onChange,
+}: {
+  selectedMonth: string;
+  onChange: (month: string) => void;
+}) {
+  const { t } = useTranslation();
+  const monthDate = useMemo(() => parse(selectedMonth, MONTH_KEY_FORMAT, new Date()), [selectedMonth]);
+  const isCurrentMonth = selectedMonth === getCurrentMonthKey();
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#202133] px-2 py-1.5">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10"
+        onClick={() => onChange(format(subMonths(monthDate, 1), MONTH_KEY_FORMAT))}
+        aria-label={t("budget.previousMonth")}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="min-w-32 text-center text-sm font-semibold capitalize">
+        {format(monthDate, "MMMM yyyy")}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10"
+        onClick={() => onChange(format(addMonths(monthDate, 1), MONTH_KEY_FORMAT))}
+        aria-label={t("budget.nextMonth")}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      {!isCurrentMonth && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-1 border-white/10 bg-transparent text-white hover:bg-white/10"
+          onClick={() => onChange(getCurrentMonthKey())}
+        >
+          {t("budget.jumpToToday")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function Budget() {
   const { t } = useTranslation();
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
   const { data: user } = useQuery<any>({
     queryKey: ["/api/user/profile"],
   });
@@ -32,6 +90,10 @@ export default function Budget() {
           </div>
         </div>
 
+        <div className="mb-4 flex justify-start">
+          <MonthSwitcher selectedMonth={selectedMonth} onChange={setSelectedMonth} />
+        </div>
+
         <Tabs defaultValue="recurring">
           <TabsList className="border border-white/10 bg-[#202133]">
             <TabsTrigger
@@ -48,10 +110,10 @@ export default function Budget() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="recurring" className="mt-4">
-            <RecurringExpensesDashboard monthlyIncome={monthlyIncome} />
+            <RecurringExpensesDashboard monthlyIncome={monthlyIncome} selectedMonth={selectedMonth} />
           </TabsContent>
           <TabsContent value="payPeriod" className="mt-4">
-            <CurrentPayPeriodDashboard />
+            <CurrentPayPeriodDashboard selectedMonth={selectedMonth} />
           </TabsContent>
         </Tabs>
       </div>

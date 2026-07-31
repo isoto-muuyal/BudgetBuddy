@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarClock, Layers, Plus, RefreshCw, Save, Trash2, Wallet } from "lucide-react";
+import { format, parse, subMonths } from "date-fns";
+import { CalendarClock, Download, Layers, Plus, RefreshCw, Save, Trash2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -25,6 +27,8 @@ import {
 } from "@shared/schema";
 import { useTranslation } from "react-i18next";
 
+const MONTH_KEY_FORMAT = "yyyy-MM";
+
 interface RecurringExpenseRow {
   id: string;
   name: string;
@@ -33,10 +37,12 @@ interface RecurringExpenseRow {
   category: RecurringExpenseCategory;
   type: RecurringExpenseType;
   enabled: boolean;
+  month: string;
 }
 
 interface RecurringExpensesDashboardProps {
   monthlyIncome?: number;
+  selectedMonth: string;
 }
 
 const FREQUENCY_MONTHLY_MULTIPLIERS: Record<RecurringExpenseFrequency, number> = {
@@ -77,7 +83,7 @@ const DEFAULT_FORM = {
   type: "housing" as RecurringExpenseType,
 };
 
-export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: RecurringExpensesDashboardProps) {
+export default function RecurringExpensesDashboard({ monthlyIncome = 0, selectedMonth }: RecurringExpensesDashboardProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [expenseForm, setExpenseForm] = useState({ ...DEFAULT_FORM });
@@ -86,18 +92,32 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
   const [filterCategory, setFilterCategory] = useState<RecurringExpenseCategory | "all">("all");
   const [filterType, setFilterType] = useState<RecurringExpenseType | "all">("all");
   const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importSourceMonth, setImportSourceMonth] = useState(() =>
+    format(subMonths(parse(selectedMonth, MONTH_KEY_FORMAT, new Date()), 1), MONTH_KEY_FORMAT)
+  );
+
+  const recurringQueryKey = [`/api/recurring-expenses?month=${selectedMonth}`];
+
+  const importMonthOptions = useMemo(() => {
+    const base = parse(selectedMonth, MONTH_KEY_FORMAT, new Date());
+    return Array.from({ length: 12 }, (_, index) => {
+      const date = subMonths(base, index + 1);
+      return { key: format(date, MONTH_KEY_FORMAT), label: format(date, "MMMM yyyy") };
+    });
+  }, [selectedMonth]);
 
   const { data: expenses = [], isLoading } = useQuery<RecurringExpenseRow[]>({
-    queryKey: ["/api/recurring-expenses"],
+    queryKey: recurringQueryKey,
   });
 
   const addExpenseMutation = useMutation({
     mutationFn: async (payload: typeof DEFAULT_FORM) => {
-      const response = await apiRequest("POST", "/api/recurring-expenses", payload);
+      const response = await apiRequest("POST", "/api/recurring-expenses", { ...payload, month: selectedMonth });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recurring-expenses"] });
+      queryClient.invalidateQueries({ queryKey: recurringQueryKey });
       setExpenseForm({ ...DEFAULT_FORM });
       toast({ title: t("budget.addedTitle"), description: t("budget.addedDesc") });
     },
@@ -118,11 +138,12 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
         frequency: payload.frequency,
         category: payload.category,
         type: payload.type,
+        month: selectedMonth,
       });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recurring-expenses"] });
+      queryClient.invalidateQueries({ queryKey: recurringQueryKey });
       setEditingExpenseId(null);
       toast({ title: t("budget.updatedTitle"), description: t("budget.updatedDesc") });
     },
@@ -143,9 +164,9 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
       return response.json();
     },
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/recurring-expenses"] });
-      const previous = queryClient.getQueryData<RecurringExpenseRow[]>(["/api/recurring-expenses"]);
-      queryClient.setQueryData<RecurringExpenseRow[]>(["/api/recurring-expenses"], (current) =>
+      await queryClient.cancelQueries({ queryKey: recurringQueryKey });
+      const previous = queryClient.getQueryData<RecurringExpenseRow[]>(recurringQueryKey);
+      queryClient.setQueryData<RecurringExpenseRow[]>(recurringQueryKey, (current) =>
         (current ?? []).map((expense) =>
           expense.id === payload.expenseId ? { ...expense, enabled: payload.enabled } : expense
         )
@@ -154,7 +175,7 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
     },
     onError: (error: any, _payload, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(["/api/recurring-expenses"], context.previous);
+        queryClient.setQueryData(recurringQueryKey, context.previous);
       }
       toast({
         title: t("budget.updateErrorTitle"),
@@ -163,7 +184,7 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
       });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recurring-expenses"] });
+      queryClient.invalidateQueries({ queryKey: recurringQueryKey });
     },
   });
 
@@ -171,7 +192,29 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
     mutationFn: async (expenseId: string) => {
       await apiRequest("DELETE", `/api/recurring-expenses/${expenseId}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/recurring-expenses"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: recurringQueryKey }),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (fromMonth: string) => {
+      const response = await apiRequest("POST", "/api/recurring-expenses/import", {
+        fromMonth,
+        toMonth: selectedMonth,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: recurringQueryKey });
+      setImportDialogOpen(false);
+      toast({ title: t("budget.importSuccessTitle"), description: t("budget.importSuccessDesc") });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("budget.importErrorTitle"),
+        description: error?.message || t("budget.importErrorDesc"),
+        variant: "destructive",
+      });
+    },
   });
 
   const monthlyTotalAll = useMemo(
@@ -422,6 +465,15 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
               <Layers className="mr-2 h-4 w-4" />
               {t("budget.groupButton")}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/10 bg-transparent text-white hover:bg-white/10"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {t("budget.importFromPreviousMonth")}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -590,6 +642,38 @@ export default function RecurringExpensesDashboard({ monthlyIncome = 0 }: Recurr
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="border-white/10 bg-[#202133] text-white">
+          <DialogHeader>
+            <DialogTitle>{t("budget.importDialogTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="mb-1 block text-xs text-slate-400">{t("budget.importSourceMonthLabel")}</label>
+            <Select value={importSourceMonth} onValueChange={setImportSourceMonth}>
+              <SelectTrigger className="border-white/10 bg-[#171827] text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {importMonthOptions.map((option) => (
+                  <SelectItem key={option.key} value={option.key}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => importMutation.mutate(importSourceMonth)}
+              disabled={importMutation.isPending}
+              className="bg-amber-500 text-slate-950 hover:bg-amber-400"
+            >
+              {t("budget.importButton")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

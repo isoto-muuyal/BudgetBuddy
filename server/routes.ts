@@ -22,9 +22,11 @@ import {
   recurringExpenseInputSchema,
   recurringExpenseUpdateSchema,
   recurringExpenseToggleSchema,
+  recurringExpenseImportSchema,
   payPeriodExpenseInputSchema,
   payPeriodExpenseUpdateSchema,
   payPeriodExpenseToggleSchema,
+  monthKeySchema,
   pageContentUpdateSchema,
   PAGE_CONTENT_SLUGS,
   incomeBreakdownInputSchema,
@@ -72,21 +74,27 @@ function toMonthlyEquivalent(amount: number, frequency: RecurringExpenseFrequenc
   return amount * (FREQUENCY_MONTHLY_MULTIPLIERS[frequency] ?? 1);
 }
 
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const googleStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
+  let googleConfig: openidClient.Configuration | undefined;
 
-  async function getGoogleClient() {
+  async function getGoogleConfig() {
     if (!config.google.clientId || !config.google.clientSecret || !config.google.redirectUrl) {
       throw new Error("Google OAuth is not configured");
     }
-    const openid = openidClient as any;
-    const issuer = await openid.Issuer.discover("https://accounts.google.com");
-    return new issuer.Client({
-      client_id: config.google.clientId,
-      client_secret: config.google.clientSecret,
-      redirect_uris: [config.google.redirectUrl],
-      response_types: ["code"],
-    });
+    if (!googleConfig) {
+      googleConfig = await openidClient.discovery(
+        new URL("https://accounts.google.com"),
+        config.google.clientId,
+        config.google.clientSecret
+      );
+    }
+    return googleConfig;
   }
 
   function cleanupGoogleStates() {
@@ -198,6 +206,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/users/:id/temporary-password", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const result = await authService.generateTemporaryPasswordByAdmin(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.message === "User not found" ? 404 : 500;
+      res.status(statusCode).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/admin/users/:id", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
     try {
       await storage.deleteUserCascade(req.params.id);
@@ -271,6 +289,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/complete-password-change", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+      const result = await authService.completeForcedPasswordChange(req.user.id, newPassword);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     try {
       const { name, email, subject, message } = contactFormSchema.parse(req.body);
@@ -321,6 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: user.fullName,
         monthlyIncome: user.monthlyIncome,
         emailVerified: user.emailVerified,
+        forcePasswordChange: user.forcePasswordChange,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -502,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let monthlyExpenses: { needs: number; wants: number; savings: number } | undefined;
       if (input.includeMonthlyExpenses) {
-        const recurring = await storage.getRecurringExpensesByUser(req.user.id);
+        const recurring = await storage.getRecurringExpensesByUser(req.user.id, getCurrentMonthKey());
         const totals = { needs: 0, wants: 0, savings: 0 };
         for (const expense of recurring) {
           if (!expense.enabled) continue;
@@ -585,10 +614,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/recurring-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const expenses = await storage.getRecurringExpensesByUser(req.user.id);
+      const month = monthKeySchema.parse(req.query.month);
+      const expenses = await storage.getRecurringExpensesByUser(req.user.id, month);
       res.json(expenses);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(400).json({ message: error.message });
     }
   });
 
@@ -601,6 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         frequency: expenseData.frequency,
         category: expenseData.category,
         type: expenseData.type,
+        month: expenseData.month,
       });
       res.json(expense);
     } catch (error: any) {
@@ -617,8 +648,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         frequency: expenseData.frequency,
         category: expenseData.category,
         type: expenseData.type,
+        month: expenseData.month,
       });
       res.json(expense);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/recurring-expenses/import", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { fromMonth, toMonth } = recurringExpenseImportSchema.parse(req.body);
+      const expenses = await storage.copyRecurringExpensesToMonth(req.user.id, fromMonth, toMonth);
+      res.json(expenses);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -645,10 +687,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/pay-period-expenses", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const expenses = await storage.getActivePayPeriodExpensesByUser(req.user.id);
+      const month = monthKeySchema.parse(req.query.month);
+      const expenses = await storage.getPayPeriodExpensesByUserAndMonth(req.user.id, month);
       res.json(expenses);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(400).json({ message: error.message });
     }
   });
 
@@ -660,6 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: expenseData.amount,
         category: expenseData.category,
         sourceRecurringExpenseId: expenseData.sourceRecurringExpenseId ?? null,
+        month: expenseData.month,
       });
       res.json(expense);
     } catch (error: any) {
@@ -675,6 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: expenseData.amount,
         category: expenseData.category,
         sourceRecurringExpenseId: expenseData.sourceRecurringExpenseId ?? null,
+        month: expenseData.month,
       });
       res.json(expense);
     } catch (error: any) {
@@ -701,34 +746,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/pay-period-expenses/reset", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      await storage.archiveAllPayPeriodExpenses(req.user.id);
-      res.json({ message: "Pay period reset" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   app.get("/api/auth/google", async (_req, res) => {
     try {
       cleanupGoogleStates();
-      const client = await getGoogleClient();
-      const openid = openidClient as any;
-      const codeVerifier = openid.generators.codeVerifier();
-      const codeChallenge = openid.generators.codeChallenge(codeVerifier);
-      const state = openid.generators.state();
+      const googleAuthConfig = await getGoogleConfig();
+      const codeVerifier = openidClient.randomPKCECodeVerifier();
+      const codeChallenge = await openidClient.calculatePKCECodeChallenge(codeVerifier);
+      const state = openidClient.randomState();
 
       googleStateStore.set(state, { codeVerifier, createdAt: Date.now() });
 
-      const authUrl = client.authorizationUrl({
+      const authUrl = openidClient.buildAuthorizationUrl(googleAuthConfig, {
+        redirect_uri: config.google.redirectUrl,
         scope: "openid email profile",
         state,
         code_challenge: codeChallenge,
         code_challenge_method: "S256",
       });
 
-      res.redirect(authUrl);
+      res.redirect(authUrl.href);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -748,14 +784,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       googleStateStore.delete(state);
 
-      const client = await getGoogleClient();
-      const tokenSet = await client.callback(
-        config.google.redirectUrl,
-        { code, state },
-        { code_verifier: stateEntry.codeVerifier }
-      );
+      const googleAuthConfig = await getGoogleConfig();
+      const currentUrl = new URL(req.originalUrl, config.google.redirectUrl);
+      const tokenSet = await openidClient.authorizationCodeGrant(googleAuthConfig, currentUrl, {
+        pkceCodeVerifier: stateEntry.codeVerifier,
+        expectedState: state,
+      });
 
-      const userInfo = await client.userinfo(tokenSet.access_token as string);
+      const subject = tokenSet.claims()?.sub;
+      if (!subject) {
+        return res.status(400).json({ message: "Google account subject not available" });
+      }
+      const userInfo = await openidClient.fetchUserInfo(googleAuthConfig, tokenSet.access_token, subject);
       const email = typeof userInfo.email === "string" ? userInfo.email : "";
       if (!email) {
         return res.status(400).json({ message: "Google account email not available" });

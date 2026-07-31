@@ -9,7 +9,15 @@ import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } f
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000;
 
 export class AuthService {
-  buildAuthResponse(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null; frozen?: boolean | null }) {
+  buildAuthResponse(user: {
+    id: string;
+    email: string;
+    fullName: string;
+    monthlyIncome: string | null;
+    emailVerified: boolean | null;
+    frozen?: boolean | null;
+    forcePasswordChange?: boolean | null;
+  }) {
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwt.secret,
@@ -24,6 +32,7 @@ export class AuthService {
         fullName: user.fullName,
         monthlyIncome: user.monthlyIncome,
         emailVerified: !!user.emailVerified,
+        forcePasswordChange: !!user.forcePasswordChange,
       },
     };
   }
@@ -63,7 +72,15 @@ export class AuthService {
     };
   }
 
-  async completeLogin(user: { id: string; email: string; fullName: string; monthlyIncome: string | null; emailVerified: boolean | null; frozen?: boolean | null }) {
+  async completeLogin(user: {
+    id: string;
+    email: string;
+    fullName: string;
+    monthlyIncome: string | null;
+    emailVerified: boolean | null;
+    frozen?: boolean | null;
+    forcePasswordChange?: boolean | null;
+  }) {
     if (user.frozen) {
       throw new Error("This account has been frozen. Please contact support.");
     }
@@ -79,11 +96,28 @@ export class AuthService {
     }
 
     const isValidPassword = await bcrypt.compare(loginData.password, user.password);
-    if (!isValidPassword) {
+    if (isValidPassword) {
+      return this.completeLogin(user);
+    }
+
+    const isValidTemporaryPassword = user.temporaryPasswordHash
+      ? await bcrypt.compare(loginData.password, user.temporaryPasswordHash)
+      : false;
+    if (!isValidTemporaryPassword) {
       throw new Error("Invalid email or password");
     }
 
-    return this.completeLogin(user);
+    await storage.consumeTemporaryPassword(user.id);
+    await storage.recordLogin(user.id);
+    return this.buildAuthResponse({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      monthlyIncome: user.monthlyIncome,
+      emailVerified: user.emailVerified,
+      frozen: user.frozen,
+      forcePasswordChange: true,
+    });
   }
 
   async verifyEmail(token: string) {
@@ -129,6 +163,33 @@ export class AuthService {
     await this.sendPasswordResetForUser(user);
 
     return { message: `Password reset link sent to ${user.email}` };
+  }
+
+  async generateTemporaryPasswordByAdmin(userId: string) {
+    const user = await storage.getUser(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const temporaryPassword = randomBytes(9).toString("base64url");
+    const temporaryPasswordHash = await bcrypt.hash(temporaryPassword, 12);
+    await storage.setTemporaryPassword(user.id, temporaryPasswordHash);
+
+    return {
+      message: `Temporary password generated for ${user.email}`,
+      temporaryPassword,
+    };
+  }
+
+  async completeForcedPasswordChange(userId: string, newPassword: string) {
+    if (newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters long.");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await storage.completeForcedPasswordChange(userId, hashedPassword);
+
+    return { message: "Password updated successfully" };
   }
 
   async resetPassword(data: ResetPasswordInput) {

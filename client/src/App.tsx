@@ -1,10 +1,14 @@
-import { useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient, getAuthToken } from "./lib/queryClient";
+import { apiRequest, queryClient, getAuthToken } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Income from "@/pages/income";
@@ -29,6 +33,105 @@ import VisitTracker from "@/components/visit-tracker";
 
 
 const AUTH_ONLY_PAGES = ["/", "/login", "/signup"];
+const FORCE_PASSWORD_CHANGE_KEY = "force_password_change";
+const FORCE_PASSWORD_CHANGE_EVENT = "force-password-change-changed";
+
+function ForcedPasswordChangeModal() {
+  const [required, setRequired] = useState(localStorage.getItem(FORCE_PASSWORD_CHANGE_KEY) === "true");
+  const [newPassword, setNewPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let active = true;
+
+    const refreshRequiredState = () => {
+      if (!getAuthToken()) {
+        if (active) setRequired(false);
+        localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
+        return;
+      }
+
+      apiRequest("GET", "/api/user/profile")
+        .then((response) => response.json())
+        .then((user) => {
+          if (!active) return;
+          const mustChangePassword = Boolean(user.forcePasswordChange);
+          setRequired(mustChangePassword);
+          if (mustChangePassword) {
+            localStorage.setItem(FORCE_PASSWORD_CHANGE_KEY, "true");
+          } else {
+            localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
+          }
+        })
+        .catch(() => {
+          if (active && localStorage.getItem(FORCE_PASSWORD_CHANGE_KEY) === "true") {
+            setRequired(true);
+          }
+        });
+    };
+
+    window.addEventListener(FORCE_PASSWORD_CHANGE_EVENT, refreshRequiredState);
+    refreshRequiredState();
+
+    return () => {
+      active = false;
+      window.removeEventListener(FORCE_PASSWORD_CHANGE_EVENT, refreshRequiredState);
+    };
+  }, []);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/auth/complete-password-change", { newPassword });
+      const data = await response.json();
+      setRequired(false);
+      setNewPassword("");
+      localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
+      window.dispatchEvent(new Event(FORCE_PASSWORD_CHANGE_EVENT));
+      toast({
+        title: "Password updated",
+        description: data.message || "Your password was updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not update password",
+        description: error instanceof Error ? error.message : "Password update failed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={required} onOpenChange={() => undefined}>
+      <DialogContent className="[&>button]:hidden">
+        <DialogHeader>
+          <DialogTitle>Set a New Password</DialogTitle>
+          <DialogDescription>
+            You signed in with a temporary password. Create a new password before continuing.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            type="password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            placeholder="New password"
+            minLength={6}
+            required
+          />
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Updating..." : "Update Password"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -65,6 +168,7 @@ function Router() {
         <Route component={NotFound} />
       </Switch>
       <LoadingOverlay />
+      <ForcedPasswordChangeModal />
     </div>
   );
 }
