@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail } from "lucide-react";
+import { Download, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,10 +39,25 @@ type VisitRow = {
   userIdentifier: string;
 };
 
+type VisitsResponse = {
+  rows: VisitRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 type RankedItem = {
   name: string;
   count: number;
 };
+
+type VisitStats = {
+  topPages: RankedItem[];
+  topButtons: RankedItem[];
+  uniqueUsers: number;
+};
+
+const VISIT_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 type AdminUserRow = {
   id: string;
@@ -122,18 +138,69 @@ export default function AdminPage() {
     },
   });
 
-  const visitsQuery = useQuery<VisitRow[]>({
-    queryKey: ["/api/admin/visits", adminToken],
+  const [visitsPage, setVisitsPage] = useState(1);
+  const [visitsPageSize, setVisitsPageSize] = useState<number>(20);
+
+  const visitsQuery = useQuery<VisitsResponse>({
+    queryKey: ["/api/admin/visits", adminToken, visitsPage, visitsPageSize],
     enabled: isAuthenticated && Boolean(adminToken),
     queryFn: async () => {
       try {
-        return await adminFetch("/api/admin/visits");
+        return await adminFetch(`/api/admin/visits?page=${visitsPage}&pageSize=${visitsPageSize}`);
       } catch (error) {
         handleAuthError(error);
         throw error;
       }
     },
     refetchInterval: 10000,
+  });
+
+  const visitStatsQuery = useQuery<VisitStats>({
+    queryKey: ["/api/admin/visits/stats", adminToken],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        return await adminFetch("/api/admin/visits/stats");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+    refetchInterval: 10000,
+  });
+
+  const exportVisitsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/visits/export", {
+        headers: { Authorization: `Bearer ${getAdminToken()}` },
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const error = new Error(body.message || "Export failed") as Error & { status?: number };
+        error.status = response.status;
+        throw error;
+      }
+      return response.blob();
+    },
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `visit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error: any) => {
+      handleAuthError(error);
+      toast({
+        title: "Export failed",
+        description: error?.message || "Could not export visit logs.",
+        variant: "destructive",
+      });
+    },
   });
 
   const usersQuery = useQuery<AdminUserRow[]>({
@@ -239,25 +306,17 @@ export default function AdminPage() {
     },
   });
 
-  const rows = useMemo(() => visitsQuery.data ?? [], [visitsQuery.data]);
+  const rows = useMemo(() => visitsQuery.data?.rows ?? [], [visitsQuery.data]);
+  const visitsTotal = visitsQuery.data?.total ?? 0;
+  const visitsPageCount = Math.max(1, Math.ceil(visitsTotal / visitsPageSize));
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
-  const stats = useMemo(() => {
-    const rankTop = (values: string[]): RankedItem[] =>
-      Object.entries(values.reduce<Record<string, number>>((acc, value) => {
-        if (!value) return acc;
-        acc[value] = (acc[value] || 0) + 1;
-        return acc;
-      }, {}))
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([name, count]) => ({ name, count }));
+  const stats: VisitStats = visitStatsQuery.data ?? { topPages: [], topButtons: [], uniqueUsers: 0 };
 
-    const topPages = rankTop(rows.map((row) => row.page));
-    const topButtons = rankTop(rows.map((row) => row.button));
-    const uniqueUsers = new Set(rows.map((row) => row.userIdentifier).filter(Boolean)).size;
-
-    return { topPages, topButtons, uniqueUsers };
-  }, [rows]);
+  useEffect(() => {
+    if (visitsPage > visitsPageCount) {
+      setVisitsPage(visitsPageCount);
+    }
+  }, [visitsPage, visitsPageCount]);
 
   if (!isAuthenticated) {
     return (
@@ -385,8 +444,40 @@ export default function AdminPage() {
           </div>
 
           <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
-            <CardHeader>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>Visit Logs</CardTitle>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Rows per page</span>
+                  <Select
+                    value={String(visitsPageSize)}
+                    onValueChange={(value) => {
+                      setVisitsPageSize(Number(value));
+                      setVisitsPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VISIT_PAGE_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={exportVisitsMutation.isPending}
+                  onClick={() => exportVisitsMutation.mutate()}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {exportVisitsMutation.isPending ? "Exporting..." : "Export CSV"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -423,6 +514,34 @@ export default function AdminPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-gray-500">
+                  {visitsTotal === 0
+                    ? "No visits"
+                    : `Showing ${(visitsPage - 1) * visitsPageSize + 1}-${Math.min(visitsPage * visitsPageSize, visitsTotal)} of ${visitsTotal}`}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={visitsPage <= 1}
+                    onClick={() => setVisitsPage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-gray-500">
+                    Page {visitsPage} of {visitsPageCount}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={visitsPage >= visitsPageCount}
+                    onClick={() => setVisitsPage((page) => Math.min(visitsPageCount, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

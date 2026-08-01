@@ -69,8 +69,8 @@ export class AdminService {
     });
   }
 
-  async getVisits(): Promise<VisitLogEntry[]> {
-    const visits = await storage.getVisits();
+  async getVisits(params?: { limit: number; offset: number }): Promise<VisitLogEntry[]> {
+    const visits = await storage.getVisits(params);
     return visits.map((visit: SiteVisit) => ({
       timestamp: visit.timestamp.toISOString(),
       page: visit.page,
@@ -80,6 +80,33 @@ export class AdminService {
       ipAddress: visit.ipAddress ?? "",
       userIdentifier: visit.userIdentifier ?? "",
     }));
+  }
+
+  async getVisitsCount(): Promise<number> {
+    return storage.getVisitsCount();
+  }
+
+  async getVisitStats() {
+    return storage.getVisitStats();
+  }
+
+  buildVisitsCsv(entries: VisitLogEntry[]): string {
+    const header = ["Timestamp", "Page", "Button", "Section", "Location", "IP Address", "User"];
+    const escapeCell = (value: string): string => {
+      if (/[",\n]/.test(value)) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    };
+    const lines = [header.join(",")];
+    for (const entry of entries) {
+      lines.push(
+        [entry.timestamp, entry.page, entry.button, entry.section, entry.location, entry.ipAddress, entry.userIdentifier]
+          .map(escapeCell)
+          .join(",")
+      );
+    }
+    return lines.join("\n");
   }
 }
 

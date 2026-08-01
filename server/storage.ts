@@ -162,7 +162,13 @@ export interface IStorage {
     ipAddress: string;
     userIdentifier: string;
   }): Promise<void>;
-  getVisits(): Promise<SiteVisit[]>;
+  getVisits(params?: { limit: number; offset: number }): Promise<SiteVisit[]>;
+  getVisitsCount(): Promise<number>;
+  getVisitStats(): Promise<{
+    topPages: Array<{ name: string; count: number }>;
+    topButtons: Array<{ name: string; count: number }>;
+    uniqueUsers: number;
+  }>;
 
   // Page content methods
   getPageContent(slug: string): Promise<PageContent | undefined>;
@@ -896,8 +902,54 @@ export class DatabaseStorage implements IStorage {
     await db.insert(siteVisits).values(entry);
   }
 
-  async getVisits(): Promise<SiteVisit[]> {
+  async getVisits(params?: { limit: number; offset: number }): Promise<SiteVisit[]> {
+    if (params) {
+      return db
+        .select()
+        .from(siteVisits)
+        .orderBy(desc(siteVisits.timestamp))
+        .limit(params.limit)
+        .offset(params.offset);
+    }
     return db.select().from(siteVisits).orderBy(desc(siteVisits.timestamp));
+  }
+
+  async getVisitsCount(): Promise<number> {
+    const [row] = await db.select({ value: count() }).from(siteVisits);
+    return row?.value ?? 0;
+  }
+
+  async getVisitStats(): Promise<{
+    topPages: Array<{ name: string; count: number }>;
+    topButtons: Array<{ name: string; count: number }>;
+    uniqueUsers: number;
+  }> {
+    const [topPagesRows, topButtonsRows, [uniqueUsersRow]] = await Promise.all([
+      db
+        .select({ name: siteVisits.page, value: count() })
+        .from(siteVisits)
+        .where(sql`${siteVisits.page} <> ''`)
+        .groupBy(siteVisits.page)
+        .orderBy(desc(count()))
+        .limit(10),
+      db
+        .select({ name: siteVisits.button, value: count() })
+        .from(siteVisits)
+        .where(sql`${siteVisits.button} <> ''`)
+        .groupBy(siteVisits.button)
+        .orderBy(desc(count()))
+        .limit(10),
+      db
+        .select({ value: sql<number>`count(distinct ${siteVisits.userIdentifier})` })
+        .from(siteVisits)
+        .where(sql`${siteVisits.userIdentifier} <> ''`),
+    ]);
+
+    return {
+      topPages: topPagesRows.map((row) => ({ name: row.name ?? "", count: Number(row.value) })),
+      topButtons: topButtonsRows.map((row) => ({ name: row.name ?? "", count: Number(row.value) })),
+      uniqueUsers: Number(uniqueUsersRow?.value ?? 0),
+    };
   }
 
   async getPageContent(slug: string): Promise<PageContent | undefined> {

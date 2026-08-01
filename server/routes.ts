@@ -168,10 +168,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/visits", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+  const ALLOWED_VISIT_PAGE_SIZES = [20, 50, 100];
+
+  app.get("/api/admin/visits", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const requestedPageSize = parseInt(String(req.query.pageSize ?? "20"), 10);
+      const pageSize = ALLOWED_VISIT_PAGE_SIZES.includes(requestedPageSize) ? requestedPageSize : 20;
+      const requestedPage = parseInt(String(req.query.page ?? "1"), 10);
+      const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+      const offset = (page - 1) * pageSize;
+
+      const [rows, total] = await Promise.all([
+        adminService.getVisits({ limit: pageSize, offset }),
+        adminService.getVisitsCount(),
+      ]);
+
+      res.json({ rows, total, page, pageSize });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/stats", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+    try {
+      const stats = await adminService.getVisitStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/export", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
     try {
       const visits = await adminService.getVisits();
-      res.json(visits);
+      const csv = adminService.buildVisitsCsv(visits);
+      const filename = `visit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
