@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { config } from "../config";
 import { storage } from "../storage";
 import { emailService } from "./email";
+import { logger } from "./logger";
 import type { SignupUser, LoginUser, ForgotPasswordInput, ResetPasswordInput } from "@shared/schema";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 20 * 60 * 1000;
@@ -37,10 +38,11 @@ export class AuthService {
     };
   }
 
-  async signup(userData: SignupUser) {
+  async signup(userData: SignupUser, traceId?: string) {
     // Check if user already exists
     const existingUser = await storage.getUserByEmail(userData.email);
     if (existingUser) {
+      logger.warn("Signup rejected: email already registered", { traceId, email: userData.email });
       throw new Error("User already exists with this email");
     }
 
@@ -58,57 +60,100 @@ export class AuthService {
       verificationToken,
     });
 
+    // Non-sensitive: helps correlate against later login attempts if a user
+    // reports "correct password" being rejected (e.g. mobile autofill/autocorrect
+    // mangling what actually gets submitted).
+    logger.info("Signup succeeded", {
+      traceId,
+      userId: user.id,
+      email: user.email,
+      credentialLength: userData.password.length,
+      hashPrefix: hashedPassword.slice(0, 7),
+    });
+
     // Send verification email
     try {
       await emailService.sendVerificationEmail(user.email, user.fullName, verificationToken);
     } catch (error) {
-      console.error("Failed to send verification email:", error);
+      logger.error("Failed to send verification email", {
+        traceId,
+        userId: user.id,
+        email: user.email,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Don't fail signup if email fails
     }
 
-    return { 
+    return {
       message: "Account created successfully. Please check your email for verification.",
-      userId: user.id 
+      userId: user.id
     };
   }
 
-  async completeLogin(user: {
-    id: string;
-    email: string;
-    fullName: string;
-    monthlyIncome: string | null;
-    emailVerified: boolean | null;
-    frozen?: boolean | null;
-    forcePasswordChange?: boolean | null;
-  }) {
+  async completeLogin(
+    user: {
+      id: string;
+      email: string;
+      fullName: string;
+      monthlyIncome: string | null;
+      emailVerified: boolean | null;
+      frozen?: boolean | null;
+      forcePasswordChange?: boolean | null;
+    },
+    traceId?: string
+  ) {
     if (user.frozen) {
+      logger.warn("Login rejected: account frozen", { traceId, userId: user.id, email: user.email });
       throw new Error("This account has been frozen. Please contact support.");
     }
 
     await storage.recordLogin(user.id);
+    logger.info("Login succeeded", { traceId, userId: user.id, email: user.email });
     return this.buildAuthResponse(user);
   }
 
-  async login(loginData: LoginUser) {
+  async login(loginData: LoginUser, traceId?: string) {
     const user = await storage.getUserByEmail(loginData.email);
     if (!user) {
+      logger.warn("Login failed: no account for email", {
+        traceId,
+        email: loginData.email,
+        credentialLength: loginData.password.length,
+      });
       throw new Error("Invalid email or password");
     }
 
     const isValidPassword = await bcrypt.compare(loginData.password, user.password);
     if (isValidPassword) {
-      return this.completeLogin(user);
+      return this.completeLogin(user, traceId);
     }
 
     const isValidTemporaryPassword = user.temporaryPasswordHash
       ? await bcrypt.compare(loginData.password, user.temporaryPasswordHash)
       : false;
     if (!isValidTemporaryPassword) {
+      // Non-sensitive diagnostics only: never log the raw password or hash.
+      // credentialLength/hashPrefix let us tell apart "user is mistyping/autofill
+      // is mangling the password" from "stored hash looks malformed" without
+      // exposing any secret material.
+      logger.warn("Login failed: password did not match stored or temporary hash", {
+        traceId,
+        userId: user.id,
+        email: user.email,
+        emailVerified: !!user.emailVerified,
+        frozen: !!user.frozen,
+        mustChangeCredential: !!user.forcePasswordChange,
+        hasTemporaryCredential: !!user.temporaryPasswordHash,
+        temporaryCredentialUsedAt: user.temporaryPasswordUsedAt,
+        credentialLength: loginData.password.length,
+        storedHashPrefix: user.password.slice(0, 7),
+      });
       throw new Error("Invalid email or password");
     }
 
     await storage.consumeTemporaryPassword(user.id);
     await storage.recordLogin(user.id);
+    logger.info("Login succeeded via temporary password", { traceId, userId: user.id, email: user.email });
     return this.buildAuthResponse({
       id: user.id,
       email: user.email,

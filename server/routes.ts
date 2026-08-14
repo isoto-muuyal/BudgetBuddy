@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req, res) => {
     try {
       const userData = signupSchema.parse(req.body);
-      const result = await authService.signup(userData);
+      const result = await authService.signup(userData, req.traceId);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -282,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const loginData = loginSchema.parse(req.body);
-      const result = await authService.login(loginData);
+      const result = await authService.login(loginData, req.traceId);
       res.json(result);
     } catch (error: any) {
       res.status(401).json({ message: error.message });
@@ -851,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let authResponse;
       try {
-        authResponse = await authService.completeLogin(user);
+        authResponse = await authService.completeLogin(user, req.traceId);
       } catch (loginError: any) {
         if (config.google.frontendRedirect) {
           const redirectUrl = new URL(config.google.frontendRedirect);
