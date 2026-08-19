@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { incomeBreakdownInputSchema, type IncomeBreakdownInput, type IncomeBreakdown } from "@shared/schema";
 import { useTranslation } from "react-i18next";
 
@@ -81,6 +81,7 @@ export default function FiftyThirtyTwenty() {
         total,
       });
       setShowResults(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
       toast({
         title: t("fiftyThirtyTwenty.savedTitle"),
         description: t("fiftyThirtyTwenty.savedDesc"),
