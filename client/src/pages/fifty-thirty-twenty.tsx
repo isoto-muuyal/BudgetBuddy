@@ -81,6 +81,7 @@ export default function FiftyThirtyTwenty() {
         total,
       });
       setShowResults(true);
+      queryClient.setQueryData(["/api/income"], data);
       queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
       toast({
         title: t("fiftyThirtyTwenty.savedTitle"),

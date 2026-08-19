@@ -147,6 +147,13 @@ export const siteVisits = pgTable("site_visits", {
   location: text("location"),
   ipAddress: text("ip_address"),
   userIdentifier: text("user_identifier"),
+  visitorId: text("visitor_id"),
+});
+
+export const trustedVisitors = pgTable("trusted_visitors", {
+  identifier: text("identifier").primaryKey(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const loginEvents = pgTable("login_events", {
@@ -398,6 +405,7 @@ export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type AppVersion = typeof appVersions.$inferSelect;
 export type Admin = typeof admins.$inferSelect;
 export type SiteVisit = typeof siteVisits.$inferSelect;
+export type TrustedVisitor = typeof trustedVisitors.$inferSelect;
 export type LoginEvent = typeof loginEvents.$inferSelect;
 export type PageContent = typeof pageContent.$inferSelect;
 export type PageContentUpdateInput = z.infer<typeof pageContentUpdateSchema>;

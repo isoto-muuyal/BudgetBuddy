@@ -2,6 +2,22 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { getAuthToken } from "@/lib/queryClient";
 
+const VISITOR_ID_KEY = "bw_visitor_id";
+
+function getVisitorId(): string {
+  try {
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (existing) {
+      return existing;
+    }
+    const generated = crypto.randomUUID();
+    localStorage.setItem(VISITOR_ID_KEY, generated);
+    return generated;
+  } catch {
+    return "";
+  }
+}
+
 function getLoggedInUserIdentifier(): string {
   const token = getAuthToken();
   if (!token) {
@@ -31,6 +47,7 @@ function sendVisit(payload: { page: string; button?: string; section?: string })
   const body = JSON.stringify({
     ...payload,
     userIdentifier: getLoggedInUserIdentifier(),
+    visitorId: getVisitorId(),
   });
 
   if (navigator.sendBeacon) {

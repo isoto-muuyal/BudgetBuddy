@@ -73,6 +73,20 @@ export async function ensureDatabaseSchema(): Promise<void> {
         user_identifier text
       )
     `);
+    await pool.query(`
+      ALTER TABLE site_visits
+      ADD COLUMN IF NOT EXISTS visitor_id text
+    `);
+  };
+
+  const ensureTrustedVisitorsTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS trusted_visitors (
+        identifier text PRIMARY KEY,
+        note text,
+        created_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
   };
 
   const ensureLoginEventsTable = async () => {
@@ -463,6 +477,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAppVersionsTable();
     await ensureAdminTable();
     await ensureSiteVisitsTable();
+    await ensureTrustedVisitorsTable();
     await ensureLoginEventsTable();
     await ensureUserAuthColumns();
     await ensureAnalysisIntelligenceTables();
@@ -487,6 +502,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAppVersionsTable();
       await ensureAdminTable();
       await ensureSiteVisitsTable();
+      await ensureTrustedVisitorsTable();
       await ensureLoginEventsTable();
       await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
@@ -503,6 +519,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensureAppVersionsTable();
       await ensureAdminTable();
       await ensureSiteVisitsTable();
+      await ensureTrustedVisitorsTable();
       await ensureLoginEventsTable();
       await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
@@ -535,6 +552,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         await ensureAdminTable();
       }
       await ensureSiteVisitsTable();
+      await ensureTrustedVisitorsTable();
       await ensureLoginEventsTable();
       await ensureUserAuthColumns();
       await ensureAnalysisIntelligenceTables();
@@ -617,6 +635,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensureAppVersionsTable();
     await ensureAdminTable();
     await ensureSiteVisitsTable();
+    await ensureTrustedVisitorsTable();
     await ensureLoginEventsTable();
     await ensureUserAuthColumns();
     await ensureAnalysisIntelligenceTables();

@@ -12,6 +12,7 @@ export type VisitLogEntry = {
   location: string;
   ipAddress: string;
   userIdentifier: string;
+  visitorId: string;
 };
 
 export class AdminService {
@@ -79,6 +80,7 @@ export class AdminService {
       location: visit.location ?? "",
       ipAddress: visit.ipAddress ?? "",
       userIdentifier: visit.userIdentifier ?? "",
+      visitorId: visit.visitorId ?? "",
     }));
   }
 
@@ -88,6 +90,30 @@ export class AdminService {
 
   async getVisitStats() {
     return storage.getVisitStats();
+  }
+
+  async getDailyVisitHistory(days?: number) {
+    return storage.getDailyVisitHistory(days);
+  }
+
+  async getWeeklyVisitTotals(weeks?: number) {
+    return storage.getWeeklyVisitTotals(weeks);
+  }
+
+  async getRepeatVisitorAlerts(days?: number) {
+    return storage.getRepeatVisitorAlerts(days);
+  }
+
+  async listTrustedVisitors() {
+    return storage.listTrustedVisitors();
+  }
+
+  async addTrustedVisitor(identifier: string, note?: string) {
+    return storage.addTrustedVisitor(identifier, note);
+  }
+
+  async removeTrustedVisitor(identifier: string): Promise<void> {
+    return storage.removeTrustedVisitor(identifier);
   }
 
   buildVisitsCsv(entries: VisitLogEntry[]): string {

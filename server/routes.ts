@@ -160,6 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: adminService.getVisitorLocation(req.headers as Record<string, unknown>),
         ipAddress: adminService.getClientIp(req.headers as Record<string, unknown>, req.ip),
         userIdentifier: typeof req.body?.userIdentifier === "string" ? req.body.userIdentifier : "",
+        visitorId: typeof req.body?.visitorId === "string" ? req.body.visitorId : "",
       });
 
       res.json({ message: "Visit tracked" });
@@ -206,6 +207,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(csv);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/daily", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const requestedDays = parseInt(String(req.query.days ?? "30"), 10);
+      const days = Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(requestedDays, 90) : 30;
+      const history = await adminService.getDailyVisitHistory(days);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/weekly", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const requestedWeeks = parseInt(String(req.query.weeks ?? "12"), 10);
+      const weeks = Number.isFinite(requestedWeeks) && requestedWeeks > 0 ? Math.min(requestedWeeks, 52) : 12;
+      const totals = await adminService.getWeeklyVisitTotals(weeks);
+      res.json(totals);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/repeat", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const requestedDays = parseInt(String(req.query.days ?? "7"), 10);
+      const days = Number.isFinite(requestedDays) && requestedDays > 0 ? Math.min(requestedDays, 30) : 7;
+      const alerts = await adminService.getRepeatVisitorAlerts(days);
+      res.json(alerts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visits/trusted", authenticateAdminToken, async (_req: AuthenticatedAdminRequest, res) => {
+    try {
+      const trusted = await adminService.listTrustedVisitors();
+      res.json(trusted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/visits/trusted", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const identifier = typeof req.body?.identifier === "string" ? req.body.identifier.trim() : "";
+      const note = typeof req.body?.note === "string" ? req.body.note : undefined;
+      if (!identifier) {
+        return res.status(400).json({ message: "identifier is required" });
+      }
+      const trusted = await adminService.addTrustedVisitor(identifier, note);
+      res.json(trusted);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/visits/trusted/:identifier", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      await adminService.removeTrustedVisitor(req.params.identifier);
+      res.json({ message: "Trusted visitor removed" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

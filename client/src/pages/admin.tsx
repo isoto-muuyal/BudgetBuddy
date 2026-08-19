@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Mail } from "lucide-react";
+import { Download, Mail, ShieldCheck, X } from "lucide-react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,6 +68,47 @@ type VisitStats = {
 };
 
 const VISIT_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+type DailyVisitPoint = {
+  date: string;
+  totalVisits: number;
+  uniqueVisitors: number;
+};
+
+type WeeklyVisitTotal = {
+  weekStart: string;
+  totalVisits: number;
+};
+
+type RepeatVisitorAlert = {
+  date: string;
+  identifier: string;
+  ipAddress: string;
+  visits: number;
+};
+
+type TrustedVisitor = {
+  identifier: string;
+  note: string | null;
+  createdAt: string;
+};
+
+const CHART_COLORS = {
+  totalVisits: "#2563eb",
+  uniqueVisitors: "#059669",
+};
+
+function formatChartDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function truncateIdentifier(identifier: string): string {
+  if (identifier.includes(".") || identifier.includes(":")) {
+    return identifier; // looks like an IP, show as-is
+  }
+  return identifier.length > 12 ? `${identifier.slice(0, 8)}…` : identifier;
+}
 
 type AdminUserRow = {
   id: string;
@@ -167,6 +218,90 @@ export default function AdminPage() {
       }
     },
     refetchInterval: 10000,
+  });
+
+  const dailyHistoryQuery = useQuery<DailyVisitPoint[]>({
+    queryKey: ["/api/admin/visits/daily", adminToken],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        return await adminFetch("/api/admin/visits/daily?days=30");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+  });
+
+  const weeklyTotalsQuery = useQuery<WeeklyVisitTotal[]>({
+    queryKey: ["/api/admin/visits/weekly", adminToken],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        return await adminFetch("/api/admin/visits/weekly?weeks=8");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+  });
+
+  const repeatVisitorsQuery = useQuery<RepeatVisitorAlert[]>({
+    queryKey: ["/api/admin/visits/repeat", adminToken],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        return await adminFetch("/api/admin/visits/repeat?days=7");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+    refetchInterval: 10000,
+  });
+
+  const trustedVisitorsQuery = useQuery<TrustedVisitor[]>({
+    queryKey: ["/api/admin/visits/trusted", adminToken],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        return await adminFetch("/api/admin/visits/trusted");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+  });
+
+  const addTrustedVisitorMutation = useMutation({
+    mutationFn: async (identifier: string) =>
+      adminFetch("/api/admin/visits/trusted", {
+        method: "POST",
+        body: JSON.stringify({ identifier, note: "Marked from repeat-visitor alerts" }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/visits/trusted", adminToken] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/visits/repeat", adminToken] });
+      toast({ title: "Marked as trusted", description: "This visitor will no longer trigger repeat-visit alerts." });
+    },
+    onError: (error: any) => {
+      handleAuthError(error);
+      toast({
+        title: "Could not mark as trusted",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeTrustedVisitorMutation = useMutation({
+    mutationFn: async (identifier: string) =>
+      adminFetch(`/api/admin/visits/trusted/${encodeURIComponent(identifier)}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/visits/trusted", adminToken] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/visits/repeat", adminToken] });
+    },
+    onError: handleAuthError,
   });
 
   const exportVisitsMutation = useMutation({
@@ -311,6 +446,16 @@ export default function AdminPage() {
   const visitsPageCount = Math.max(1, Math.ceil(visitsTotal / visitsPageSize));
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const stats: VisitStats = visitStatsQuery.data ?? { topPages: [], topButtons: [], uniqueUsers: 0 };
+  const dailyHistory = useMemo(
+    () => (dailyHistoryQuery.data ?? []).map((point) => ({ ...point, label: formatChartDate(point.date) })),
+    [dailyHistoryQuery.data]
+  );
+  const weeklyTotals = weeklyTotalsQuery.data ?? [];
+  const thisWeekTotal = weeklyTotals.at(-1)?.totalVisits ?? 0;
+  const lastWeekTotal = weeklyTotals.at(-2)?.totalVisits ?? 0;
+  const uniqueVisitorsToday = dailyHistory.at(-1)?.uniqueVisitors ?? 0;
+  const repeatVisitors = repeatVisitorsQuery.data ?? [];
+  const trustedVisitors = trustedVisitorsQuery.data ?? [];
 
   useEffect(() => {
     if (visitsPage > visitsPageCount) {
@@ -438,6 +583,154 @@ export default function AdminPage() {
                       <div className="text-sm text-gray-500">No button clicks yet.</div>
                     )}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 mb-6 md:grid-cols-3">
+            <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+              <CardHeader>
+                <CardTitle className="text-sm text-gray-500">Unique Visitors Today</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-gray-900">{uniqueVisitorsToday}</div>
+                <div className="text-sm text-gray-500">Deduped by visitor id, falls back to IP</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+              <CardHeader>
+                <CardTitle className="text-sm text-gray-500">This Week</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-gray-900">{thisWeekTotal}</div>
+                <div className="text-sm text-gray-500">Visits since Monday</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+              <CardHeader>
+                <CardTitle className="text-sm text-gray-500">Last Week</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-gray-900">{lastWeekTotal}</div>
+                <div className="text-sm text-gray-500">Total visits, previous week</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-white rounded-2xl shadow-xl border border-gray-100 mb-6">
+            <CardHeader>
+              <CardTitle>Visit History (Last 30 Days)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dailyHistoryQuery.isLoading ? (
+                <div className="text-sm text-gray-500">Loading history...</div>
+              ) : (
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dailyHistory} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6b7280" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} tickLine={false} axisLine={false} width={32} />
+                      <RechartsTooltip
+                        contentStyle={{ borderRadius: 8, borderColor: "#e5e7eb", fontSize: 13 }}
+                        labelStyle={{ color: "#111827", fontWeight: 600 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 13 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="totalVisits"
+                        name="Total Visits"
+                        stroke={CHART_COLORS.totalVisits}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="uniqueVisitors"
+                        name="Unique Visitors"
+                        stroke={CHART_COLORS.uniqueVisitors}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 mb-6 lg:grid-cols-2">
+            <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+              <CardHeader>
+                <CardTitle>Repeat Visitors (Last 7 Days)</CardTitle>
+                <div className="text-sm text-gray-500">
+                  Same visitor (or IP) hitting the site more than once in a day. Mark yourself as trusted to stop seeing your own testing traffic here.
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {repeatVisitors.length === 0 && !repeatVisitorsQuery.isLoading && (
+                    <div className="text-sm text-gray-500">No repeat visitors in the last 7 days.</div>
+                  )}
+                  {repeatVisitors.map((alert) => (
+                    <div
+                      key={`${alert.date}-${alert.identifier}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-gray-500">{alert.date}</span>
+                          <span className="font-semibold truncate">{alert.ipAddress || truncateIdentifier(alert.identifier)}</span>
+                          <Badge variant="secondary">{alert.visits} visits</Badge>
+                        </div>
+                        {alert.ipAddress !== alert.identifier && (
+                          <div className="text-xs text-gray-400 truncate">visitor id: {truncateIdentifier(alert.identifier)}</div>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={addTrustedVisitorMutation.isPending}
+                        onClick={() => addTrustedVisitorMutation.mutate(alert.identifier)}
+                      >
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Mark trusted
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white rounded-2xl shadow-xl border border-gray-100">
+              <CardHeader>
+                <CardTitle>Trusted Visitors</CardTitle>
+                <div className="text-sm text-gray-500">Excluded from the repeat-visitor alert above.</div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {trustedVisitors.length === 0 && !trustedVisitorsQuery.isLoading && (
+                    <div className="text-sm text-gray-500">No trusted visitors yet.</div>
+                  )}
+                  {trustedVisitors.map((trusted) => (
+                    <div
+                      key={trusted.identifier}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    >
+                      <span className="font-mono truncate">{trusted.identifier}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={removeTrustedVisitorMutation.isPending}
+                        onClick={() => removeTrustedVisitorMutation.mutate(trusted.identifier)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

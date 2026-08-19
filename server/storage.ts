@@ -15,6 +15,7 @@ import {
   actualExpenseSets,
   smartAnalysisResults,
   siteVisits,
+  trustedVisitors,
   loginEvents,
   type User,
   type InsertUser,
@@ -35,6 +36,7 @@ import {
   type ActualExpenseSet,
   type SmartAnalysisResult,
   type SiteVisit,
+  type TrustedVisitor,
 } from "@shared/schema";
 import { db } from "./db";
 import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
@@ -161,6 +163,7 @@ export interface IStorage {
     location: string;
     ipAddress: string;
     userIdentifier: string;
+    visitorId: string;
   }): Promise<void>;
   getVisits(params?: { limit: number; offset: number }): Promise<SiteVisit[]>;
   getVisitsCount(): Promise<number>;
@@ -169,6 +172,12 @@ export interface IStorage {
     topButtons: Array<{ name: string; count: number }>;
     uniqueUsers: number;
   }>;
+  getDailyVisitHistory(days?: number): Promise<Array<{ date: string; totalVisits: number; uniqueVisitors: number }>>;
+  getWeeklyVisitTotals(weeks?: number): Promise<Array<{ weekStart: string; totalVisits: number }>>;
+  getRepeatVisitorAlerts(days?: number): Promise<Array<{ date: string; identifier: string; ipAddress: string; visits: number }>>;
+  listTrustedVisitors(): Promise<TrustedVisitor[]>;
+  addTrustedVisitor(identifier: string, note?: string): Promise<TrustedVisitor>;
+  removeTrustedVisitor(identifier: string): Promise<void>;
 
   // Page content methods
   getPageContent(slug: string): Promise<PageContent | undefined>;
@@ -898,6 +907,7 @@ export class DatabaseStorage implements IStorage {
     location: string;
     ipAddress: string;
     userIdentifier: string;
+    visitorId: string;
   }): Promise<void> {
     await db.insert(siteVisits).values(entry);
   }
@@ -950,6 +960,103 @@ export class DatabaseStorage implements IStorage {
       topButtons: topButtonsRows.map((row) => ({ name: row.name ?? "", count: Number(row.value) })),
       uniqueUsers: Number(uniqueUsersRow?.value ?? 0),
     };
+  }
+
+  async getDailyVisitHistory(days = 30): Promise<Array<{ date: string; totalVisits: number; uniqueVisitors: number }>> {
+    const dayExpr = sql`date_trunc('day', ${siteVisits.timestamp})`;
+    const rows = await db
+      .select({
+        date: sql<string>`to_char(${dayExpr}, 'YYYY-MM-DD')`,
+        totalVisits: count(),
+        uniqueVisitors: sql<number>`count(distinct coalesce(nullif(${siteVisits.visitorId}, ''), nullif(${siteVisits.ipAddress}, '')))`,
+      })
+      .from(siteVisits)
+      .where(sql`${siteVisits.timestamp} >= now() - interval '1 day' * ${days}`)
+      .groupBy(dayExpr)
+      .orderBy(dayExpr);
+
+    const byDate = new Map(
+      rows.map((row) => [row.date, { totalVisits: Number(row.totalVisits), uniqueVisitors: Number(row.uniqueVisitors) }])
+    );
+
+    // Fill in days with no visits so the chart has a continuous series.
+    const result: Array<{ date: string; totalVisits: number; uniqueVisitors: number }> = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const key = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const existing = byDate.get(key);
+      result.push({ date: key, totalVisits: existing?.totalVisits ?? 0, uniqueVisitors: existing?.uniqueVisitors ?? 0 });
+    }
+    return result;
+  }
+
+  async getWeeklyVisitTotals(weeks = 12): Promise<Array<{ weekStart: string; totalVisits: number }>> {
+    const weekExpr = sql`date_trunc('week', ${siteVisits.timestamp})`;
+    const rows = await db
+      .select({
+        weekStart: sql<string>`to_char(${weekExpr}, 'YYYY-MM-DD')`,
+        totalVisits: count(),
+      })
+      .from(siteVisits)
+      .where(sql`${siteVisits.timestamp} >= now() - interval '1 week' * ${weeks}`)
+      .groupBy(weekExpr)
+      .orderBy(weekExpr);
+
+    return rows.map((row) => ({ weekStart: row.weekStart, totalVisits: Number(row.totalVisits) }));
+  }
+
+  async getRepeatVisitorAlerts(days = 7): Promise<Array<{ date: string; identifier: string; ipAddress: string; visits: number }>> {
+    const trusted = await this.listTrustedVisitors();
+    const trustedIds = trusted.map((row) => row.identifier);
+
+    const conditions = [sql`${siteVisits.timestamp} >= now() - interval '1 day' * ${days}`];
+    if (trustedIds.length > 0) {
+      conditions.push(sql`coalesce(${siteVisits.visitorId}, '') <> ALL(${trustedIds})`);
+      conditions.push(sql`coalesce(${siteVisits.ipAddress}, '') <> ALL(${trustedIds})`);
+    }
+
+    const dayExpr = sql`date_trunc('day', ${siteVisits.timestamp})`;
+    const identifierExpr = sql<string>`coalesce(nullif(${siteVisits.visitorId}, ''), nullif(${siteVisits.ipAddress}, ''), 'unknown')`;
+
+    const rows = await db
+      .select({
+        date: sql<string>`to_char(${dayExpr}, 'YYYY-MM-DD')`,
+        identifier: identifierExpr,
+        ipAddress: sql<string>`max(${siteVisits.ipAddress})`,
+        visits: count(),
+      })
+      .from(siteVisits)
+      .where(and(...conditions))
+      .groupBy(dayExpr, identifierExpr)
+      .having(sql`count(*) > 1`)
+      .orderBy(desc(dayExpr), desc(count()));
+
+    return rows.map((row) => ({
+      date: row.date,
+      identifier: row.identifier,
+      ipAddress: row.ipAddress ?? "",
+      visits: Number(row.visits),
+    }));
+  }
+
+  async listTrustedVisitors(): Promise<TrustedVisitor[]> {
+    return db.select().from(trustedVisitors).orderBy(desc(trustedVisitors.createdAt));
+  }
+
+  async addTrustedVisitor(identifier: string, note?: string): Promise<TrustedVisitor> {
+    const [row] = await db
+      .insert(trustedVisitors)
+      .values({ identifier, note: note || null })
+      .onConflictDoUpdate({ target: trustedVisitors.identifier, set: { note: note || null } })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to add trusted visitor");
+    }
+    return row;
+  }
+
+  async removeTrustedVisitor(identifier: string): Promise<void> {
+    await db.delete(trustedVisitors).where(eq(trustedVisitors.identifier, identifier));
   }
 
   async getPageContent(slug: string): Promise<PageContent | undefined> {
