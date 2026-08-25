@@ -1,5 +1,5 @@
 import fs from "fs";
-import { InferenceClient } from "@huggingface/inference";
+import OpenAI from "openai";
 import { config } from "../config";
 import { storage } from "../storage";
 import { vectorStoreService } from "./vector-store-service";
@@ -91,8 +91,7 @@ interface McpRecommendationsResponse extends Record<string, unknown> {
 }
 
 export class AIService {
-  private readonly agentClient: InferenceClient;
-  private readonly agentModel: string;
+  private readonly agentClient: OpenAI;
 
   private static readonly SUBCATEGORY_TO_CATEGORY: Record<string, Exclude<ExpenseCategory, "undefined">> = {
     housing: "50%",
@@ -122,13 +121,10 @@ export class AIService {
   };
 
   constructor() {
-    const token =
-      config.ai.recommendations.accessToken ||
-      config.ai.categorization.accessToken ||
-      config.ai.accessToken;
-
-    this.agentClient = new InferenceClient(token);
-    this.agentModel = config.ai.recommendations.model || config.ai.categorization.model;
+    this.agentClient = new OpenAI({
+      baseURL: config.ai.baseUrl,
+      apiKey: config.ai.apiKey,
+    });
   }
 
   async analyzeExpenses(
@@ -185,6 +181,7 @@ export class AIService {
       }
 
       const response = await this.runTextCompletion({
+        model: config.ai.advisorModel,
         systemPrompt:
           "You are a financial analyst. Identify patterns and trends across multiple monthly analyses. Focus on consistent overspending or underspending categories, and summarize clear behavioral patterns.",
         userPrompt: this.buildHistoryPatternsPrompt(rows),
@@ -196,9 +193,9 @@ export class AIService {
     } catch (error: any) {
       metricsService.increment("ai_tool_failures_total", { tool: "history_patterns" });
       logger.error("History patterns AI failed", { error: this.errorMessage(error) });
-      if (error.httpResponse) {
-        console.error("HTTP error status:", error.httpResponse.status);
-        console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      if (error.status) {
+        console.error("HTTP error status:", error.status);
+        console.error("HTTP error body:", JSON.stringify(error.error, null, 2));
       }
       return "Unable to generate historical patterns at this time. Please try again later.";
     }
@@ -238,9 +235,10 @@ export class AIService {
         return this.normalizeExpenses(Array.isArray(expenses) ? expenses : []);
       }
 
-      logger.info("Calling AI categorizer tool", { provider: "huggingface" });
-      metricsService.increment("ai_tool_requests_total", { tool: "categorize_transactions", provider: "huggingface" });
+      logger.info("Calling AI categorizer tool", { provider: "openai", model: config.ai.categorizerModel });
+      metricsService.increment("ai_tool_requests_total", { tool: "categorize_transactions", provider: "openai" });
       const responseText = await this.runJsonCompletion({
+        model: config.ai.categorizerModel,
         systemPrompt:
           "You are a financial transaction categorization expert. Your task is to categorize expenses according to the 50/30/20 budgeting rule. Always return ONLY valid JSON. Do not invent or duplicate transactions. If uncertain, use 'undefined'.",
         userPrompt: prompt,
@@ -252,9 +250,9 @@ export class AIService {
     } catch (error: any) {
       metricsService.increment("ai_tool_failures_total", { tool: "categorize_transactions" });
       logger.error("Categorizer tool failed", { error: this.errorMessage(error) });
-      if (error.httpResponse) {
-        console.error("HTTP error status:", error.httpResponse.status);
-        console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      if (error.status) {
+        console.error("HTTP error status:", error.status);
+        console.error("HTTP error body:", JSON.stringify(error.error, null, 2));
       }
 
       logger.warn("Falling back to rule-based categorization", { tool: CATEGORIZER_TOOL });
@@ -301,9 +299,10 @@ export class AIService {
         return this.extractMcpText(response, "recommendations");
       }
 
-      logger.info("Calling AI recommendations tool", { provider: "huggingface" });
-      metricsService.increment("ai_tool_requests_total", { tool: "generate_budget_recommendations", provider: "huggingface" });
+      logger.info("Calling AI recommendations tool", { provider: "openai", model: config.ai.advisorModel });
+      metricsService.increment("ai_tool_requests_total", { tool: "generate_budget_recommendations", provider: "openai" });
       const responseText = await this.runTextCompletion({
+        model: config.ai.advisorModel,
         systemPrompt:
           "You are a financial advisor specializing in budget analysis using the 50/30/20 rule. Provide detailed, actionable recommendations based on the categorized expenses.",
         userPrompt: prompt,
@@ -315,9 +314,9 @@ export class AIService {
     } catch (error: any) {
       metricsService.increment("ai_tool_failures_total", { tool: "generate_budget_recommendations" });
       logger.error("Advisor tool failed", { error: this.errorMessage(error) });
-      if (error.httpResponse) {
-        console.error("HTTP error status:", error.httpResponse.status);
-        console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      if (error.status) {
+        console.error("HTTP error status:", error.status);
+        console.error("HTTP error body:", JSON.stringify(error.error, null, 2));
       }
 
       logger.warn("Falling back to rule-based recommendations", { tool: ADVISOR_TOOL });
@@ -466,9 +465,10 @@ export class AIService {
         };
       }
 
-      logger.info("Calling AI global advisor tool", { provider: "huggingface" });
-      metricsService.increment("ai_tool_requests_total", { tool: "generate_global_advice", provider: "huggingface" });
+      logger.info("Calling AI global advisor tool", { provider: "openai", model: config.ai.advisorModel });
+      metricsService.increment("ai_tool_requests_total", { tool: "generate_global_advice", provider: "openai" });
       const responseText = await this.runJsonCompletion({
+        model: config.ai.advisorModel,
         systemPrompt:
           "You are a financial progress analyst. Compare the current budget analysis against prior analyses and return ONLY JSON with a progressStatus and a three-line advice summary.",
         userPrompt: prompt,
@@ -483,9 +483,9 @@ export class AIService {
     } catch (error: any) {
       metricsService.increment("ai_tool_failures_total", { tool: "generate_global_advice" });
       logger.error("Global advisor tool failed", { error: this.errorMessage(error) });
-      if (error.httpResponse) {
-        console.error("HTTP error status:", error.httpResponse.status);
-        console.error("HTTP error body:", JSON.stringify(error.httpResponse.body, null, 2));
+      if (error.status) {
+        console.error("HTTP error status:", error.status);
+        console.error("HTTP error body:", JSON.stringify(error.error, null, 2));
       }
 
       return this.buildRuleBasedGlobalAdvice(input.historicalAnalyses);
@@ -493,13 +493,14 @@ export class AIService {
   }
 
   private async runTextCompletion(input: {
+    model: string;
     systemPrompt: string;
     userPrompt: string;
     maxTokens: number;
     temperature: number;
   }): Promise<string> {
-    const result = await this.agentClient.chatCompletion({
-      model: this.agentModel,
+    const result = await this.agentClient.chat.completions.create({
+      model: input.model,
       messages: [
         { role: "system", content: input.systemPrompt },
         { role: "user", content: input.userPrompt },
@@ -512,13 +513,14 @@ export class AIService {
   }
 
   private async runJsonCompletion(input: {
+    model: string;
     systemPrompt: string;
     userPrompt: string;
     maxTokens: number;
     temperature: number;
   }): Promise<string> {
-    const result = await this.agentClient.chatCompletion({
-      model: this.agentModel,
+    const result = await this.agentClient.chat.completions.create({
+      model: input.model,
       messages: [
         { role: "system", content: input.systemPrompt },
         { role: "user", content: input.userPrompt },
@@ -1099,6 +1101,7 @@ Keep the response concise and actionable with bullet points.
 
     try {
       const responseText = await this.runJsonCompletion({
+        model: config.ai.categorizerModel,
         systemPrompt:
           "You are a financial transaction classification expert. For each expense, decide its type (one of: " +
           EXPENSE_ITEM_TYPES.join(", ") +
@@ -1125,6 +1128,7 @@ Keep the response concise and actionable with bullet points.
   }): Promise<string> {
     try {
       const responseText = await this.runTextCompletion({
+        model: config.ai.advisorModel,
         systemPrompt:
           "You are a financial analyst. Compare a user's actual expenses against their 50/30/20 targets and/or expected recurring expenses, then provide clear, actionable recommendations.",
         userPrompt: this.buildSmartAnalysisPrompt(input),
