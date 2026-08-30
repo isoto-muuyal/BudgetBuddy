@@ -42,7 +42,7 @@ import {
   type TrustedVisitor,
 } from "@shared/schema";
 import { db } from "./db";
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { encrypt, decrypt } from "./utils/encryption";
 
 export type StoredBudgetAnalysis = Omit<BudgetAnalysis, "expenses" | "recommendations"> & {
@@ -177,6 +177,11 @@ export interface IStorage {
   }>;
   getDailyVisitHistory(days?: number): Promise<Array<{ date: string; totalVisits: number; uniqueVisitors: number }>>;
   getWeeklyVisitTotals(weeks?: number): Promise<Array<{ weekStart: string; totalVisits: number }>>;
+  getVisitHistory(params: {
+    from: Date;
+    to: Date;
+    granularity: "hour" | "day";
+  }): Promise<Array<{ bucket: string; totalVisits: number; uniqueVisitors: number }>>;
   getRepeatVisitorAlerts(days?: number): Promise<Array<{ date: string; identifier: string; ipAddress: string; visits: number }>>;
   listTrustedVisitors(): Promise<TrustedVisitor[]>;
   addTrustedVisitor(identifier: string, note?: string): Promise<TrustedVisitor>;
@@ -1022,6 +1027,52 @@ export class DatabaseStorage implements IStorage {
       .orderBy(weekExpr);
 
     return rows.map((row) => ({ weekStart: row.weekStart, totalVisits: Number(row.totalVisits) }));
+  }
+
+  async getVisitHistory(params: {
+    from: Date;
+    to: Date;
+    granularity: "hour" | "day";
+  }): Promise<Array<{ bucket: string; totalVisits: number; uniqueVisitors: number }>> {
+    const bucketExpr = sql`date_trunc(${params.granularity}, ${siteVisits.timestamp})`;
+    const bucketFormat = params.granularity === "hour" ? "YYYY-MM-DD HH24:00" : "YYYY-MM-DD";
+
+    const rows = await db
+      .select({
+        bucket: sql<string>`to_char(${bucketExpr}, ${bucketFormat})`,
+        totalVisits: count(),
+        uniqueVisitors: sql<number>`count(distinct coalesce(nullif(${siteVisits.visitorId}, ''), nullif(${siteVisits.ipAddress}, '')))`,
+      })
+      .from(siteVisits)
+      .where(and(gte(siteVisits.timestamp, params.from), lte(siteVisits.timestamp, params.to)))
+      .groupBy(bucketExpr)
+      .orderBy(bucketExpr);
+
+    const byBucket = new Map(
+      rows.map((row) => [row.bucket, { totalVisits: Number(row.totalVisits), uniqueVisitors: Number(row.uniqueVisitors) }])
+    );
+
+    // Fill in buckets with no visits so the chart has a continuous series.
+    const result: Array<{ bucket: string; totalVisits: number; uniqueVisitors: number }> = [];
+    if (params.granularity === "hour") {
+      const dayStr = params.from.toISOString().slice(0, 10);
+      for (let hour = 0; hour < 24; hour++) {
+        const key = `${dayStr} ${String(hour).padStart(2, "0")}:00`;
+        const existing = byBucket.get(key);
+        result.push({ bucket: key, totalVisits: existing?.totalVisits ?? 0, uniqueVisitors: existing?.uniqueVisitors ?? 0 });
+      }
+    } else {
+      const cursor = new Date(Date.UTC(params.from.getUTCFullYear(), params.from.getUTCMonth(), params.from.getUTCDate()));
+      const end = new Date(Date.UTC(params.to.getUTCFullYear(), params.to.getUTCMonth(), params.to.getUTCDate()));
+      while (cursor <= end) {
+        const key = cursor.toISOString().slice(0, 10);
+        const existing = byBucket.get(key);
+        result.push({ bucket: key, totalVisits: existing?.totalVisits ?? 0, uniqueVisitors: existing?.uniqueVisitors ?? 0 });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    }
+
+    return result;
   }
 
   async getRepeatVisitorAlerts(days = 7): Promise<Array<{ date: string; identifier: string; ipAddress: string; visits: number }>> {

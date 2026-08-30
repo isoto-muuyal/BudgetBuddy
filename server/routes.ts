@@ -237,6 +237,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/visits/history", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
+    try {
+      const granularity = req.query.granularity === "hour" ? "hour" : "day";
+
+      const requestedFrom = new Date(String(req.query.from ?? ""));
+      const requestedTo = new Date(String(req.query.to ?? ""));
+      if (Number.isNaN(requestedFrom.getTime()) || Number.isNaN(requestedTo.getTime()) || requestedFrom > requestedTo) {
+        return res.status(400).json({ message: "Valid from/to query params are required" });
+      }
+
+      // Defensive caps so a crafted request can't force an unbounded scan/result set.
+      const maxSpanMs = (granularity === "hour" ? 7 : 366) * 24 * 60 * 60 * 1000;
+      const to = requestedTo.getTime() - requestedFrom.getTime() > maxSpanMs
+        ? new Date(requestedFrom.getTime() + maxSpanMs)
+        : requestedTo;
+
+      const history = await adminService.getVisitHistory({ from: requestedFrom, to, granularity });
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/admin/visits/repeat", authenticateAdminToken, async (req: AuthenticatedAdminRequest, res) => {
     try {
       const requestedDays = parseInt(String(req.query.days ?? "7"), 10);

@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Mail, ShieldCheck, X } from "lucide-react";
 import {
+  endOfISOWeek,
+  getISOWeek,
+  getISOWeekYear,
+  setISOWeek,
+  setISOWeekYear,
+  startOfISOWeek,
+} from "date-fns";
+import {
   CartesianGrid,
   Legend,
   Line,
@@ -101,6 +109,47 @@ const CHART_COLORS = {
 function formatChartDate(value: string): string {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatHourLabel(value: string): string {
+  const date = new Date(`${value.replace(" ", "T")}:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString(undefined, { hour: "numeric" });
+}
+
+type ChartMode = "day" | "week" | "month" | "range";
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function todayDateInputValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+}
+
+function currentMonthInputValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+}
+
+function currentWeekInputValue(): string {
+  const now = new Date();
+  return `${getISOWeekYear(now)}-W${pad2(getISOWeek(now))}`;
+}
+
+function daysAgoDateInputValue(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function parseWeekInputValue(value: string): { start: Date; end: Date } | null {
+  const match = value.match(/^(\d{4})-W(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const anchored = setISOWeek(setISOWeekYear(new Date(year, 0, 4), year), week);
+  return { start: startOfISOWeek(anchored), end: endOfISOWeek(anchored) };
 }
 
 function truncateIdentifier(identifier: string): string {
@@ -226,6 +275,82 @@ export default function AdminPage() {
     queryFn: async () => {
       try {
         return await adminFetch("/api/admin/visits/daily?days=30");
+      } catch (error) {
+        handleAuthError(error);
+        throw error;
+      }
+    },
+  });
+
+  const [chartMode, setChartMode] = useState<ChartMode>("month");
+  const [chartDay, setChartDay] = useState(todayDateInputValue());
+  const [chartWeek, setChartWeek] = useState(currentWeekInputValue());
+  const [chartMonth, setChartMonth] = useState(currentMonthInputValue());
+  const [chartRangeFrom, setChartRangeFrom] = useState(() => daysAgoDateInputValue(6));
+  const [chartRangeTo, setChartRangeTo] = useState(todayDateInputValue());
+
+  const chartRequest = useMemo(() => {
+    if (chartMode === "day") {
+      return {
+        from: new Date(`${chartDay}T00:00:00`),
+        to: new Date(`${chartDay}T23:59:59.999`),
+        granularity: "hour" as const,
+      };
+    }
+    if (chartMode === "week") {
+      const parsed = parseWeekInputValue(chartWeek);
+      const fallback = { start: startOfISOWeek(new Date()), end: endOfISOWeek(new Date()) };
+      const { start, end } = parsed ?? fallback;
+      return { from: start, to: end, granularity: "day" as const };
+    }
+    if (chartMode === "month") {
+      const [yearStr, monthStr] = chartMonth.split("-");
+      const year = Number(yearStr) || new Date().getFullYear();
+      const month = Number(monthStr) || new Date().getMonth() + 1;
+      return {
+        from: new Date(year, month - 1, 1),
+        to: new Date(year, month, 0, 23, 59, 59, 999),
+        granularity: "day" as const,
+      };
+    }
+    return {
+      from: new Date(`${chartRangeFrom}T00:00:00`),
+      to: new Date(`${chartRangeTo}T23:59:59.999`),
+      granularity: "day" as const,
+    };
+  }, [chartMode, chartDay, chartWeek, chartMonth, chartRangeFrom, chartRangeTo]);
+
+  const chartTitle = useMemo(() => {
+    if (chartMode === "day") {
+      return `Visit History — ${chartRequest.from.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
+    }
+    if (chartMode === "week") {
+      return `Visit History — Week of ${chartRequest.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    }
+    if (chartMode === "month") {
+      return `Visit History — ${chartRequest.from.toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
+    }
+    return `Visit History — ${chartRequest.from.toLocaleDateString(undefined, { month: "short", day: "numeric" })} to ${chartRequest.to.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }, [chartMode, chartRequest]);
+
+  const chartHistoryQuery = useQuery<Array<{ bucket: string; totalVisits: number; uniqueVisitors: number }>>({
+    queryKey: [
+      "/api/admin/visits/history",
+      adminToken,
+      chartMode,
+      chartRequest.from.toISOString(),
+      chartRequest.to.toISOString(),
+      chartRequest.granularity,
+    ],
+    enabled: isAuthenticated && Boolean(adminToken),
+    queryFn: async () => {
+      try {
+        const params = new URLSearchParams({
+          from: chartRequest.from.toISOString(),
+          to: chartRequest.to.toISOString(),
+          granularity: chartRequest.granularity,
+        });
+        return await adminFetch(`/api/admin/visits/history?${params.toString()}`);
       } catch (error) {
         handleAuthError(error);
         throw error;
@@ -450,6 +575,14 @@ export default function AdminPage() {
     () => (dailyHistoryQuery.data ?? []).map((point) => ({ ...point, label: formatChartDate(point.date) })),
     [dailyHistoryQuery.data]
   );
+  const chartData = useMemo(
+    () =>
+      (chartHistoryQuery.data ?? []).map((point) => ({
+        ...point,
+        label: chartRequest.granularity === "hour" ? formatHourLabel(point.bucket) : formatChartDate(point.bucket),
+      })),
+    [chartHistoryQuery.data, chartRequest.granularity]
+  );
   const weeklyTotals = weeklyTotalsQuery.data ?? [];
   const thisWeekTotal = weeklyTotals.at(-1)?.totalVisits ?? 0;
   const lastWeekTotal = weeklyTotals.at(-2)?.totalVisits ?? 0;
@@ -619,16 +752,73 @@ export default function AdminPage() {
           </div>
 
           <Card className="bg-white rounded-2xl shadow-xl border border-gray-100 mb-6">
-            <CardHeader>
-              <CardTitle>Visit History (Last 30 Days)</CardTitle>
+            <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <CardTitle>{chartTitle}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-1">
+                  {(["day", "week", "month", "range"] as const).map((mode) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={chartMode === mode ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setChartMode(mode)}
+                      className="capitalize"
+                    >
+                      {mode}
+                    </Button>
+                  ))}
+                </div>
+                {chartMode === "day" && (
+                  <Input
+                    type="date"
+                    value={chartDay}
+                    onChange={(event) => setChartDay(event.target.value)}
+                    className="w-40"
+                  />
+                )}
+                {chartMode === "week" && (
+                  <Input
+                    type="week"
+                    value={chartWeek}
+                    onChange={(event) => setChartWeek(event.target.value)}
+                    className="w-40"
+                  />
+                )}
+                {chartMode === "month" && (
+                  <Input
+                    type="month"
+                    value={chartMonth}
+                    onChange={(event) => setChartMonth(event.target.value)}
+                    className="w-40"
+                  />
+                )}
+                {chartMode === "range" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={chartRangeFrom}
+                      onChange={(event) => setChartRangeFrom(event.target.value)}
+                      className="w-36"
+                    />
+                    <span className="text-sm text-gray-500">to</span>
+                    <Input
+                      type="date"
+                      value={chartRangeTo}
+                      onChange={(event) => setChartRangeTo(event.target.value)}
+                      className="w-36"
+                    />
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {dailyHistoryQuery.isLoading ? (
+              {chartHistoryQuery.isLoading ? (
                 <div className="text-sm text-gray-500">Loading history...</div>
               ) : (
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dailyHistory} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6b7280" }} tickLine={false} axisLine={{ stroke: "#e5e7eb" }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} tickLine={false} axisLine={false} width={32} />

@@ -100,6 +100,10 @@ export class AdminService {
     return storage.getWeeklyVisitTotals(weeks);
   }
 
+  async getVisitHistory(params: { from: Date; to: Date; granularity: "hour" | "day" }) {
+    return storage.getVisitHistory(params);
+  }
+
   async getRepeatVisitorAlerts(days?: number) {
     return storage.getRepeatVisitorAlerts(days);
   }
