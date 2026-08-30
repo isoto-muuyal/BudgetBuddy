@@ -12,6 +12,7 @@ import {
   type ExpenseItem,
   type ExpenseItemType,
   type ExpenseItemCategory,
+  type QuickNoteItem,
 } from "@shared/schema";
 
 export const CATEGORIZER_AGENT = "CATEGORIZER_AGENT";
@@ -1142,6 +1143,98 @@ Keep the response concise and actionable with bullet points.
       logger.error("Smart analysis recommendation failed; using fallback", { error: this.errorMessage(error) });
       return this.buildRuleBasedSmartAnalysisRecommendation(input);
     }
+  }
+
+  async reviewQuickNote(input: {
+    description: string;
+    items: QuickNoteItem[];
+    userContext?: string;
+    lastAnalysis?: { snapshot: unknown; recommendations: string; createdAt: Date };
+  }): Promise<string> {
+    try {
+      const responseText = await this.runTextCompletion({
+        model: config.ai.advisorModel,
+        systemPrompt:
+          "You are a friendly, direct personal finance advisor. The user jotted down a quick, informal expense note (not a full budget) and wants a short, practical opinion on it - point out anything that looks tight, excessive, or risky, and factor in their most recent financial analysis if it's provided. Keep the response conversational and brief (3-5 sentences).",
+        userPrompt: this.buildQuickNoteReviewPrompt(input),
+        maxTokens: 512,
+        temperature: 0.6,
+      });
+
+      return responseText.trim() || "The AI didn't return a response. Please try again.";
+    } catch (error) {
+      metricsService.increment("ai_tool_failures_total", { tool: "review_quick_note" });
+      logger.error("Quick note review failed", { error: this.errorMessage(error) });
+      return "Unable to review this note right now. Please try again in a moment.";
+    }
+  }
+
+  private buildQuickNoteReviewPrompt(input: {
+    description: string;
+    items: QuickNoteItem[];
+    userContext?: string;
+    lastAnalysis?: { snapshot: unknown; recommendations: string; createdAt: Date };
+  }): string {
+    const totalAmount = input.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const totalPaid = input.items.reduce((sum, item) => sum + (Number(item.paidAmount) || 0), 0);
+
+    const rows =
+      input.items
+        .map((item) => {
+          const paid = item.paidAmount ? `, paid $${item.paidAmount}` : "";
+          const due = item.dueDate ? `, due ${item.dueDate}` : "";
+          return `- ${item.name || "(unnamed)"}: amount $${item.amount || "0"}${paid}${due}`;
+        })
+        .join("\n") || "(no line items yet)";
+
+    const contextSection = input.userContext ? `\nUser's added context: ${input.userContext}\n` : "";
+
+    return `
+Quick expense note: "${input.description}"
+
+Line items:
+${rows}
+
+Totals: amount $${totalAmount.toFixed(2)}, paid $${totalPaid.toFixed(2)}
+${contextSection}
+User's most recent financial analysis on file:
+${this.summarizeLastAnalysis(input.lastAnalysis)}
+
+Give a short, practical opinion on this expense note - is it reasonable, tight, or risky given their situation? Suggest one concrete adjustment if relevant.
+`;
+  }
+
+  private summarizeLastAnalysis(
+    analysis: { snapshot: unknown; recommendations: string; createdAt: Date } | undefined
+  ): string {
+    if (!analysis) {
+      return "No prior Smart Analysis on file for this user.";
+    }
+
+    const snapshot = analysis.snapshot as {
+      fiftyThirtyTwenty?: { needs: number; wants: number; savings: number; monthlyIncome: number };
+      monthlyExpenses?: { needs: number; wants: number; savings: number };
+    } | null;
+
+    const lines = [`Last analysis date: ${analysis.createdAt.toISOString().slice(0, 10)}`];
+
+    if (snapshot?.fiftyThirtyTwenty) {
+      const targets = snapshot.fiftyThirtyTwenty;
+      lines.push(
+        `Monthly income: $${targets.monthlyIncome.toFixed(2)}, Needs: $${targets.needs.toFixed(2)}, Wants: $${targets.wants.toFixed(2)}, Savings: $${targets.savings.toFixed(2)}`
+      );
+    }
+
+    if (snapshot?.monthlyExpenses) {
+      const actual = snapshot.monthlyExpenses;
+      lines.push(
+        `Actual monthly spend - Needs: $${actual.needs.toFixed(2)}, Wants: $${actual.wants.toFixed(2)}, Savings: $${actual.savings.toFixed(2)}`
+      );
+    }
+
+    lines.push(`Recommendations given: ${analysis.recommendations}`);
+
+    return lines.join("\n");
   }
 
   private buildExpenseClassificationPrompt(rawItems: Partial<ExpenseItem>[]): string {

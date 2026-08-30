@@ -14,6 +14,7 @@ import {
   incomes,
   actualExpenseSets,
   smartAnalysisResults,
+  quickExpenseNotes,
   siteVisits,
   trustedVisitors,
   loginEvents,
@@ -35,6 +36,8 @@ import {
   type ExpenseItem,
   type ActualExpenseSet,
   type SmartAnalysisResult,
+  type QuickExpenseNote,
+  type QuickNoteItem,
   type SiteVisit,
   type TrustedVisitor,
 } from "@shared/schema";
@@ -214,6 +217,23 @@ export interface IStorage {
       recommendations: string;
     }
   ): Promise<SmartAnalysisResult>;
+  getLatestSmartAnalysisResult(userId: string): Promise<SmartAnalysisResult | undefined>;
+
+  // Quick expense note methods
+  listQuickNotes(userId: string): Promise<QuickExpenseNote[]>;
+  getQuickNote(userId: string, id: string): Promise<QuickExpenseNote | undefined>;
+  createQuickNote(userId: string, description: string, items: QuickNoteItem[]): Promise<QuickExpenseNote>;
+  updateQuickNote(
+    userId: string,
+    id: string,
+    updates: { description: string; items: QuickNoteItem[] }
+  ): Promise<QuickExpenseNote>;
+  deleteQuickNote(userId: string, id: string): Promise<void>;
+  saveQuickNoteReview(
+    userId: string,
+    id: string,
+    review: { review: string; context: string }
+  ): Promise<QuickExpenseNote>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1219,6 +1239,97 @@ export class DatabaseStorage implements IStorage {
 
     if (!row) {
       throw new Error("Failed to create smart analysis result");
+    }
+
+    return row;
+  }
+
+  async getLatestSmartAnalysisResult(userId: string): Promise<SmartAnalysisResult | undefined> {
+    const [row] = await db
+      .select()
+      .from(smartAnalysisResults)
+      .where(eq(smartAnalysisResults.userId, userId))
+      .orderBy(desc(smartAnalysisResults.createdAt))
+      .limit(1);
+
+    return row || undefined;
+  }
+
+  async listQuickNotes(userId: string): Promise<QuickExpenseNote[]> {
+    return await db
+      .select()
+      .from(quickExpenseNotes)
+      .where(eq(quickExpenseNotes.userId, userId))
+      .orderBy(desc(quickExpenseNotes.updatedAt));
+  }
+
+  async getQuickNote(userId: string, id: string): Promise<QuickExpenseNote | undefined> {
+    const [row] = await db
+      .select()
+      .from(quickExpenseNotes)
+      .where(and(eq(quickExpenseNotes.id, id), eq(quickExpenseNotes.userId, userId)));
+
+    return row || undefined;
+  }
+
+  async createQuickNote(userId: string, description: string, items: QuickNoteItem[]): Promise<QuickExpenseNote> {
+    const [row] = await db
+      .insert(quickExpenseNotes)
+      .values({ userId, description, items })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to create quick note");
+    }
+
+    return row;
+  }
+
+  async updateQuickNote(
+    userId: string,
+    id: string,
+    updates: { description: string; items: QuickNoteItem[] }
+  ): Promise<QuickExpenseNote> {
+    const [row] = await db
+      .update(quickExpenseNotes)
+      .set({
+        description: updates.description,
+        items: updates.items,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(quickExpenseNotes.id, id), eq(quickExpenseNotes.userId, userId)))
+      .returning();
+
+    if (!row) {
+      throw new Error("Quick note not found");
+    }
+
+    return row;
+  }
+
+  async deleteQuickNote(userId: string, id: string): Promise<void> {
+    await db
+      .delete(quickExpenseNotes)
+      .where(and(eq(quickExpenseNotes.id, id), eq(quickExpenseNotes.userId, userId)));
+  }
+
+  async saveQuickNoteReview(
+    userId: string,
+    id: string,
+    review: { review: string; context: string }
+  ): Promise<QuickExpenseNote> {
+    const [row] = await db
+      .update(quickExpenseNotes)
+      .set({
+        aiReview: review.review,
+        aiReviewContext: review.context,
+        aiReviewedAt: new Date(),
+      })
+      .where(and(eq(quickExpenseNotes.id, id), eq(quickExpenseNotes.userId, userId)))
+      .returning();
+
+    if (!row) {
+      throw new Error("Quick note not found");
     }
 
     return row;

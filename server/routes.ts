@@ -32,9 +32,12 @@ import {
   incomeBreakdownInputSchema,
   actualExpenseSetUpdateSchema,
   smartAnalysisRequestSchema,
+  quickNoteInputSchema,
+  quickNoteReviewRequestSchema,
   RECURRING_EXPENSE_FREQUENCIES,
   type RecurringExpenseFrequency,
   type ExpenseItem,
+  type QuickNoteItem,
 } from "@shared/schema";
 import { config } from "./config";
 import * as openidClient from "openid-client";
@@ -664,6 +667,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Quick expense note routes
+  app.get("/api/quick-notes", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const notes = await storage.listQuickNotes(req.user.id);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/quick-notes/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const note = await storage.getQuickNote(req.user.id, req.params.id);
+      if (!note) {
+        return res.status(404).json({ message: "Quick note not found" });
+      }
+      res.json(note);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/quick-notes", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const input = quickNoteInputSchema.parse(req.body);
+      const note = await storage.createQuickNote(req.user.id, input.description, input.items);
+      res.json(note);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/quick-notes/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const input = quickNoteInputSchema.parse(req.body);
+      const note = await storage.updateQuickNote(req.user.id, req.params.id, input);
+      res.json(note);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/quick-notes/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteQuickNote(req.user.id, req.params.id);
+      res.json({ message: "Quick note deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/quick-notes/:id/review", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { context } = quickNoteReviewRequestSchema.parse(req.body);
+      const note = await storage.getQuickNote(req.user.id, req.params.id);
+      if (!note) {
+        return res.status(404).json({ message: "Quick note not found" });
+      }
+
+      const lastAnalysisResult = await storage.getLatestSmartAnalysisResult(req.user.id);
+      const review = await aiService.reviewQuickNote({
+        description: note.description,
+        items: note.items as QuickNoteItem[],
+        userContext: context,
+        lastAnalysis: lastAnalysisResult
+          ? {
+              snapshot: lastAnalysisResult.snapshot,
+              recommendations: lastAnalysisResult.recommendations,
+              createdAt: lastAnalysisResult.createdAt,
+            }
+          : undefined,
+      });
+
+      const updated = await storage.saveQuickNoteReview(req.user.id, req.params.id, { review, context });
+      res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

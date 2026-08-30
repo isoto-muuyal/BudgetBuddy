@@ -30,6 +30,7 @@ import VerifyEmail from "@/pages/verify-email";
 import History from "@/pages/history";
 import AdminPage from "@/pages/admin";
 import VisitTracker from "@/components/visit-tracker";
+import FloatingNotesButton from "@/components/quick-notes/floating-notes-button";
 
 
 const AUTH_ONLY_PAGES = ["/", "/login", "/signup"];
@@ -169,6 +170,7 @@ function Router() {
       </Switch>
       <LoadingOverlay />
       <ForcedPasswordChangeModal />
+      {!!getAuthToken() && !location.startsWith("/admin") && <FloatingNotesButton />}
     </div>
   );
 }

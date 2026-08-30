@@ -325,6 +325,22 @@ export async function ensureDatabaseSchema(): Promise<void> {
     `);
   };
 
+  const ensureQuickExpenseNotesTable = async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS quick_expense_notes (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id varchar NOT NULL REFERENCES users(id),
+        description text NOT NULL,
+        items jsonb NOT NULL DEFAULT '[]'::jsonb,
+        ai_review text,
+        ai_review_context text,
+        ai_reviewed_at timestamp,
+        created_at timestamp DEFAULT now() NOT NULL,
+        updated_at timestamp DEFAULT now() NOT NULL
+      )
+    `);
+  };
+
   const ensureSmartAnalysisResultsTable = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS smart_analysis_results (
@@ -486,6 +502,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensurePageContentTable();
     await ensureIncomesTable();
     await ensureActualExpenseSetsTable();
+    await ensureQuickExpenseNotesTable();
     await ensureSmartAnalysisResultsTable();
     return;
   }
@@ -511,6 +528,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
+      await ensureQuickExpenseNotesTable();
       await ensureSmartAnalysisResultsTable();
       return;
     }
@@ -528,6 +546,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
+      await ensureQuickExpenseNotesTable();
       await ensureSmartAnalysisResultsTable();
       console.log("app_versions and ADMIN tables ensured successfully.");
       return;
@@ -561,6 +580,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
       await ensurePageContentTable();
       await ensureIncomesTable();
       await ensureActualExpenseSetsTable();
+      await ensureQuickExpenseNotesTable();
       await ensureSmartAnalysisResultsTable();
       console.log("Database schema created successfully.");
       return;
@@ -644,6 +664,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
     await ensurePageContentTable();
     await ensureIncomesTable();
     await ensureActualExpenseSetsTable();
+    await ensureQuickExpenseNotesTable();
     await ensureSmartAnalysisResultsTable();
     console.log("Database schema created using fallback SQL.");
   } catch (error) {

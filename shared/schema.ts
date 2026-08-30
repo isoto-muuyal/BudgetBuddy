@@ -379,6 +379,40 @@ export const smartAnalysisRequestSchema = z.object({
 export type SmartAnalysisResult = typeof smartAnalysisResults.$inferSelect;
 export type SmartAnalysisRequestInput = z.infer<typeof smartAnalysisRequestSchema>;
 
+export const quickExpenseNotes = pgTable("quick_expense_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  description: text("description").notNull(),
+  items: jsonb("items").notNull().default(sql`'[]'::jsonb`),
+  aiReview: text("ai_review"),
+  aiReviewContext: text("ai_review_context"),
+  aiReviewedAt: timestamp("ai_reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const quickNoteItemSchema = z.object({
+  name: z.string().default(""),
+  amount: z.string().default(""),
+  paidAmount: z.string().optional().default(""),
+  dueDate: z.string().optional().default(""),
+});
+
+export type QuickNoteItem = z.infer<typeof quickNoteItemSchema>;
+
+export const quickNoteInputSchema = z.object({
+  description: z.string().default(""),
+  items: z.array(quickNoteItemSchema).default([]),
+});
+
+export const quickNoteReviewRequestSchema = z.object({
+  context: z.string().optional().default(""),
+});
+
+export type QuickExpenseNote = typeof quickExpenseNotes.$inferSelect;
+export type QuickNoteInput = z.infer<typeof quickNoteInputSchema>;
+export type QuickNoteReviewRequestInput = z.infer<typeof quickNoteReviewRequestSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginSchema>;
