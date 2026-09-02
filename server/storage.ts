@@ -1034,7 +1034,10 @@ export class DatabaseStorage implements IStorage {
     to: Date;
     granularity: "hour" | "day";
   }): Promise<Array<{ bucket: string; totalVisits: number; uniqueVisitors: number }>> {
-    const bucketExpr = sql`date_trunc(${params.granularity}, ${siteVisits.timestamp})`;
+    const bucketExpr =
+      params.granularity === "hour"
+        ? sql`date_trunc('hour', ${siteVisits.timestamp})`
+        : sql`date_trunc('day', ${siteVisits.timestamp})`;
     const bucketFormat = params.granularity === "hour" ? "YYYY-MM-DD HH24:00" : "YYYY-MM-DD";
 
     const rows = await db
